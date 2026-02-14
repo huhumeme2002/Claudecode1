@@ -53,10 +53,23 @@ async function injectSystemPrompt(body: any, model: any): Promise<any> {
   return modifiedBody;
 }
 
+// Helper to build upstream URL from base + client path
+function buildUpstreamUrl(apiBase: string, clientPath: string): string {
+  const base = apiBase.replace(/\/+$/, '');
+  if (base.endsWith('/v1')) {
+    return base + clientPath.replace(/^\/v1/, '');
+  }
+  return base + clientPath;
+}
+
 // Helper to build upstream headers
 function buildHeaders(apiFormat: string, apiKey: string): Record<string, string> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json'
+    'Content-Type': 'application/json',
+    'Accept': 'text/event-stream',
+    'Connection': 'keep-alive',
+    'User-Agent': 'claude-code/1.0.42',
+    'anthropic-client-version': '1.0.42',
   };
 
   if (apiFormat === 'anthropic') {
@@ -70,7 +83,7 @@ function buildHeaders(apiFormat: string, apiKey: string): Record<string, string>
 }
 
 // Core proxy handler
-async function handleProxy(req: AuthenticatedRequest, res: Response, isAnthropicEndpoint: boolean) {
+async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath: string) {
   const correlationId = randomUUID();
 
   try {
@@ -104,11 +117,12 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, isAnthropic
     // Build upstream request
     const headers = buildHeaders(model.apiFormat, model.apiKey);
     const isStreaming = modifiedBody.stream === true;
+    const upstreamUrl = buildUpstreamUrl(model.apiUrl, clientPath);
 
-    logger.info(`[${correlationId}] Proxying request to ${model.apiUrl} (format: ${model.apiFormat}, streaming: ${isStreaming})`);
+    logger.info(`[${correlationId}] Proxying request to ${upstreamUrl} (format: ${model.apiFormat}, streaming: ${isStreaming})`);
 
     // Make upstream request
-    const upstreamResponse = await fetch(model.apiUrl, {
+    const upstreamResponse = await fetch(upstreamUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(modifiedBody)
@@ -254,11 +268,11 @@ async function handleNonStreamingResponse(
 
 // Route handlers
 router.post('/chat/completions', verifyApiKey, (req: AuthenticatedRequest, res: Response) => {
-  handleProxy(req, res, false);
+  handleProxy(req, res, '/v1/chat/completions');
 });
 
 router.post('/messages', verifyApiKey, (req: AuthenticatedRequest, res: Response) => {
-  handleProxy(req, res, true);
+  handleProxy(req, res, '/v1/messages');
 });
 
 export default router;
