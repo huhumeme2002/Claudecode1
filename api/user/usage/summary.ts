@@ -34,8 +34,7 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
     const modelMap = new Map(models.map(m => [m.id, m.displayName]));
 
     const summary = grouped.map(g => ({
-      model_display: modelMap.get(g.modelId) || g.modelId,
-      model_mapping_id: g.modelId,
+      model: modelMap.get(g.modelId) || 'Unknown',
       total_requests: g._count,
       total_input_tokens: g._sum.inputTokens || 0,
       total_output_tokens: g._sum.outputTokens || 0,

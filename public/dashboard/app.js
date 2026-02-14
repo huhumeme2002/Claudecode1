@@ -233,7 +233,7 @@ function renderSummary(summary, totals) {
     }
     tbody.innerHTML = summary.map(s => `
         <tr>
-            <td><strong>${s.model_display}</strong></td>
+            <td><strong>${s.model}</strong></td>
             <td>${fmt(s.total_requests)}</td>
             <td>${fmtTokens(s.total_input_tokens)}</td>
             <td>${fmtTokens(s.total_output_tokens)}</td>
