@@ -11,15 +11,16 @@ router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =>
       orderBy: { createdAt: 'desc' },
     });
 
-    // Mask the key field - show only first 7 + last 4 chars
-    const maskedKeys = keys.map((key) => ({
+    // Mask key and convert BigInt to Number
+    const result = keys.map((key) => ({
       ...key,
       key: key.key.length > 11
         ? `${key.key.slice(0, 7)}...${key.key.slice(-4)}`
         : key.key,
+      totalTokens: Number(key.totalTokens),
     }));
 
-    res.json(maskedKeys);
+    res.json(result);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch API keys' });
   }

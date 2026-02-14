@@ -27,7 +27,10 @@ router.post('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =
       },
     });
 
-    res.json(apiKey);
+    res.json({
+      ...apiKey,
+      totalTokens: Number(apiKey.totalTokens),
+    });
   } catch (error) {
     res.status(500).json({ error: 'Failed to create API key' });
   }

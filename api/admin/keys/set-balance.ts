@@ -19,7 +19,7 @@ router.post('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =
       data: { balance },
     });
 
-    res.json(apiKey);
+    res.json({ ...apiKey, totalTokens: Number(apiKey.totalTokens) });
   } catch (error) {
     res.status(500).json({ error: 'Failed to set balance' });
   }
