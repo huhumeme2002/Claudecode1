@@ -18,6 +18,11 @@ const adminHtml = path.join(__dirname, 'public', 'admin', 'index.html');
 app.get('/admin', (_req, res) => res.sendFile(adminHtml));
 app.get('/admin/', (_req, res) => res.sendFile(adminHtml));
 
+// User Dashboard SPA
+const dashboardHtml = path.join(__dirname, 'public', 'dashboard', 'index.html');
+app.get('/dashboard', (_req, res) => res.sendFile(dashboardHtml));
+app.get('/dashboard/', (_req, res) => res.sendFile(dashboardHtml));
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Dynamic API route loading

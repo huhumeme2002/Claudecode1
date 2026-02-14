@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Dashboard - API Billing</title>
+    <style>
+        :root {
+            --bg: #0f1117;
+            --bg-card: #1a1d27;
+            --bg-hover: #222633;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text: #e5e7eb;
+            --text-dim: #9ca3af;
+            --border: #2d3348;
+            --bar-bg: #2d3348;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        /* Login */
+        .login-wrap {
+            display: flex; align-items: center; justify-content: center;
+            min-height: 100vh; padding: 20px;
+        }
+        .login-box {
+            background: var(--bg-card); padding: 40px; border-radius: 12px;
+            border: 1px solid var(--border); width: 100%; max-width: 420px;
+        }
+        .login-box h1 { font-size: 24px; margin-bottom: 8px; }
+        .login-box p { color: var(--text-dim); margin-bottom: 24px; font-size: 14px; }
+        /* PLACEHOLDER_STYLES */
+        .fg { margin-bottom: 16px; }
+        .fg label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--text-dim); }
+        .fg input, .fg select {
+            width: 100%; padding: 10px 12px; background: var(--bg);
+            border: 1px solid var(--border); border-radius: 8px;
+            color: var(--text); font-size: 14px; font-family: inherit;
+        }
+        .fg input:focus, .fg select:focus { outline: none; border-color: var(--accent); }
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 8px; font-size: 14px;
+            font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .btn-accent { background: var(--accent); color: white; }
+        .btn-accent:hover { background: var(--accent-hover); }
+        .btn-outline { background: transparent; color: var(--text-dim); border: 1px solid var(--border); }
+        .btn-outline:hover { border-color: var(--text); color: var(--text); }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .hidden { display: none !important; }
+        .text-dim { color: var(--text-dim); font-size: 13px; }
+        .alert { padding: 10px 14px; border-radius: 8px; margin-bottom: 16px; display: none; font-size: 13px; }
+        .alert.active { display: block; }
+        .alert-error { background: rgba(239,68,68,0.15); color: #fca5a5; border: 1px solid rgba(239,68,68,0.3); }
+        .alert-success { background: rgba(16,185,129,0.15); color: #6ee7b7; border: 1px solid rgba(16,185,129,0.3); }
+        .spinner { width: 14px; height: 14px; border: 2px solid rgba(255,255,255,0.3); border-top-color: white; border-radius: 50%; animation: spin .6s linear infinite; display: inline-block; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        /* Topbar */
+        .topbar {
+            background: var(--bg-card); border-bottom: 1px solid var(--border);
+            padding: 14px 30px; display: flex; justify-content: space-between; align-items: center;
+        }
+        .topbar-left { display: flex; align-items: center; gap: 16px; }
+        .topbar-left h2 { font-size: 18px; }
+        .topbar-right { display: flex; align-items: center; gap: 10px; }
+        .key-badge { font-family: monospace; font-size: 12px; background: var(--bg); padding: 4px 10px; border-radius: 6px; color: var(--text-dim); }
+        /* Container */
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px 30px; }
+        /* Cards */
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px; }
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
+        }
+        .card-label { font-size: 12px; color: var(--text-dim); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+        .card-value { font-size: 26px; font-weight: 700; }
+        .card-sub { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+        /* Section */
+        .section {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px;
+            margin-bottom: 20px; overflow: hidden;
+        }
+        .section-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .section-header h3 { font-size: 15px; }
+        .section-header select {
+            background: var(--bg); border: 1px solid var(--border); color: var(--text);
+            padding: 5px 10px; border-radius: 6px; font-size: 12px;
+        }
+        /* Table */
+        .table-wrap { overflow-x: auto; }
+        table { width: 100%; border-collapse: collapse; }
+        th { padding: 10px 20px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-dim); letter-spacing: .5px; background: rgba(0,0,0,0.2); }
+        td { padding: 12px 20px; border-top: 1px solid var(--border); font-size: 13px; }
+        tfoot td { font-weight: 600; background: rgba(0,0,0,0.15); }
+        tbody tr:hover { background: var(--bg-hover); }
+        /* Chart */
+        .chart-wrap { padding: 20px; min-height: 200px; }
+        .chart-bars { display: flex; align-items: flex-end; gap: 4px; height: 160px; }
+        .chart-bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .chart-bar { width: 100%; min-width: 8px; background: var(--accent); border-radius: 4px 4px 0 0; transition: height .3s; position: relative; }
+        .chart-bar:hover { background: var(--accent-hover); }
+        .chart-bar-label { font-size: 10px; color: var(--text-dim); white-space: nowrap; }
+        .chart-bar-tip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: var(--bg); border: 1px solid var(--border); padding: 4px 8px; border-radius: 6px; font-size: 11px; white-space: nowrap; display: none; z-index: 10; }
+        .chart-bar:hover .chart-bar-tip { display: block; }
+        /* Progress bar */
+        .progress { background: var(--bar-bg); border-radius: 6px; height: 10px; overflow: hidden; margin: 8px 0; }
+        .progress-fill { height: 100%; border-radius: 6px; transition: width .3s; }
+        /* Pagination */
+        .pagination { padding: 14px 20px; display: flex; justify-content: center; gap: 6px; }
+        .pagination button { background: var(--bg); border: 1px solid var(--border); color: var(--text-dim); padding: 6px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+        .pagination button:hover { border-color: var(--text); color: var(--text); }
+        .pagination button.active { background: var(--accent); border-color: var(--accent); color: white; }
+        .pagination button:disabled { opacity: .4; cursor: not-allowed; }
+        .empty { text-align: center; padding: 40px; color: var(--text-dim); }
+        @media (max-width: 768px) {
+            .topbar { flex-direction: column; gap: 10px; padding: 14px 16px; }
+            .container { padding: 16px; }
+            .cards { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div id="loginPage" class="login-wrap">
+        <div class="login-box">
+            <h1>User Dashboard</h1>
+            <p>Nhập API key để xem thông tin tài khoản</p>
+            <div id="loginAlert" class="alert"></div>
+            <form id="loginForm">
+                <div class="fg">
+                    <label for="apiKeyInput">API Key</label>
+                    <input type="password" id="apiKeyInput" placeholder="sk-..." required>
+                </div>
+                <button type="submit" class="btn btn-accent" style="width:100%">
+                    <span id="loginBtnText">Xem Dashboard</span>
+                    <span id="loginSpinner" class="spinner hidden"></span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="mainApp" class="hidden">
+        <header class="topbar">
+            <div class="topbar-left">
+                <h2>Dashboard</h2>
+                <span id="headerName" class="text-dim"></span>
+            </div>
+            <div class="topbar-right">
+                <span id="headerKey" class="key-badge"></span>
+                <button class="btn btn-sm btn-outline" onclick="copyKey()">Copy Key</button>
+                <button class="btn btn-sm btn-outline" onclick="logout()">Đăng xuất</button>
+            </div>
+        </header>
+
+        <main class="container">
+            <div id="dashAlert" class="alert"></div>
+
+            <!-- Stats Cards -->
+            <div class="cards" id="statsCards"></div>
+
+            <!-- Plan Info -->
+            <div class="section" id="planSection"></div>
+
+            <!-- Chart -->
+            <div class="section">
+                <div class="section-header">
+                    <h3>Chi tiêu theo ngày</h3>
+                    <select id="chartDays" onchange="loadChart()">
+                        <option value="7">7 ngày</option>
+                        <option value="14">14 ngày</option>
+                        <option value="30" selected>30 ngày</option>
+                    </select>
+                </div>
+                <div class="chart-wrap" id="chartWrap"></div>
+            </div>
+
+            <!-- Usage by Model -->
+            <div class="section">
+                <div class="section-header">
+                    <h3>Thống kê theo Model</h3>
+                    <select id="summaryDays" onchange="loadSummary()">
+                        <option value="0" selected>Tất cả</option>
+                        <option value="7">7 ngày</option>
+                        <option value="30">30 ngày</option>
+                        <option value="90">90 ngày</option>
+                    </select>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Model</th>
+                                <th>Requests</th>
+                                <th>Input Tokens</th>
+                                <th>Output Tokens</th>
+                                <th>Chi phí</th>
+                            </tr>
+                        </thead>
+                        <tbody id="summaryTable"></tbody>
+                        <tfoot id="summaryTotals"></tfoot>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Recent Logs -->
+            <div class="section">
+                <div class="section-header">
+                    <h3>Lịch sử gần đây</h3>
+                </div>
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Thời gian</th>
+                                <th>Model</th>
+                                <th>Input</th>
+                                <th>Output</th>
+                                <th>Chi phí</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentTable"></tbody>
+                    </table>
+                </div>
+                <div class="pagination" id="pagination"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js?v=1"></script>
+</body>
+</html>
