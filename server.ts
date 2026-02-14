@@ -22,8 +22,8 @@ function loadApiRoutes(dir: string, prefix: string = '/api'): void {
     const fullPath = path.join(dir, entry.name);
     if (entry.isDirectory()) {
       loadApiRoutes(fullPath, `${prefix}/${entry.name}`);
-    } else if (entry.name.endsWith('.js') || entry.name.endsWith('.ts')) {
-      const routeName = entry.name.replace(/\.(js|ts)$/, '');
+    } else if (entry.name.endsWith('.js') && !entry.name.includes('.d.') && !entry.name.endsWith('.map') && entry.name !== 'proxy.js') {
+      const routeName = entry.name.replace(/\.js$/, '');
       const routePath = `${prefix}/${routeName}`;
       try {
         const mod = require(fullPath);
