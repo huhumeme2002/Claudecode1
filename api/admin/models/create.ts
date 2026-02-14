@@ -45,8 +45,12 @@ router.post('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =
 
     clearModelCache();
     res.json(model);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to create model' });
+  } catch (error: any) {
+    if (error?.code === 'P2002') {
+      res.status(409).json({ error: 'A model with this display name already exists' });
+      return;
+    }
+    res.status(500).json({ error: 'Failed to create model', details: error?.message });
   }
 });
 
