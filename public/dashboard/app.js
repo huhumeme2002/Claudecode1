@@ -83,8 +83,6 @@ async function loadAll() {
     loadRecent();
 }
 
-// PLACEHOLDER_FUNCTIONS
-
 // Status
 async function loadStatus() {
     try {
@@ -128,21 +126,25 @@ function renderCards(d) {
 
     document.getElementById('statsCards').innerHTML = `
         <div class="card">
+            <div class="card-icon">💰</div>
             <div class="card-label">Số dư</div>
             <div class="card-value">${balanceHtml}</div>
             <div class="card-sub">${isRate ? 'Budget window hiện tại' : 'Flat balance'}</div>
         </div>
         <div class="card">
+            <div class="card-icon">📊</div>
             <div class="card-label">Tổng chi tiêu</div>
             <div class="card-value">${fmtMoney(d.total_spent)}</div>
             <div class="card-sub">Từ trước tới giờ</div>
         </div>
         <div class="card">
+            <div class="card-icon">🔢</div>
             <div class="card-label">Tổng Tokens</div>
             <div class="card-value">${fmtTokens(totalTokens)}</div>
             <div class="card-sub">Input: ${fmtTokens(d.total_input_tokens)} / Output: ${fmtTokens(d.total_output_tokens)}</div>
         </div>
         <div class="card">
+            <div class="card-icon">⏰</div>
             <div class="card-label">Thời hạn</div>
             <div class="card-value" style="${expiryClass}">${expiryHtml}</div>
             <div class="card-sub">${d.expiry ? new Date(d.expiry).toLocaleDateString('vi-VN') : '—'}</div>
@@ -152,7 +154,7 @@ function renderCards(d) {
 
 function renderPlan(d) {
     const isRate = d.plan_type === 'rate';
-    let html = '<div style="padding:20px;">';
+    let html = '<div style="padding:24px;">';
 
     if (isRate) {
         const spent = d.rate_limit_window_spent || 0;
@@ -161,23 +163,41 @@ function renderPlan(d) {
         const resetAt = d.rate_limit_window_resets_at
             ? new Date(d.rate_limit_window_resets_at).toLocaleString('vi-VN')
             : '—';
-        const barColor = pct > 90 ? 'var(--danger)' : pct > 70 ? 'var(--warning)' : 'var(--accent)';
+
+        let barGradient = 'var(--gradient-1)';
+        if (pct > 90) barGradient = 'var(--gradient-2)';
+        else if (pct > 70) barGradient = 'var(--gradient-5)';
 
         html += `
-            <div style="margin-bottom:12px;">
-                <strong>Rate Plan:</strong> ${fmtMoney(total)} / ${d.rate_limit_interval_hours} giờ
+            <div style="margin-bottom:16px;">
+                <strong style="font-size:15px;">Rate Plan:</strong>
+                <span style="color:var(--accent);font-weight:600;">${fmtMoney(total)} / ${d.rate_limit_interval_hours} giờ</span>
             </div>
-            <div style="font-size:13px;color:var(--text-dim);margin-bottom:4px;">
-                Đã dùng: ${fmtMoney(spent)} / ${fmtMoney(total)} (${pct.toFixed(1)}%)
+            <div style="font-size:13px;color:var(--text-dim);margin-bottom:8px;">
+                Đã dùng: <strong>${fmtMoney(spent)}</strong> / ${fmtMoney(total)}
+                <span style="color:var(--accent);font-weight:600;">(${pct.toFixed(1)}%)</span>
             </div>
-            <div class="progress"><div class="progress-fill" style="width:${pct}%;background:${barColor}"></div></div>
-            <div style="font-size:12px;color:var(--text-dim);">Reset lúc: ${resetAt}</div>
+            <div class="progress">
+                <div class="progress-fill" style="width:${pct}%;background:${barGradient}"></div>
+            </div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:8px;">
+                🔄 Reset lúc: <strong>${resetAt}</strong>
+            </div>
         `;
     } else {
-        html += `<div><strong>Flat Balance:</strong> ${fmtMoney(d.balance ?? 0)}</div>`;
+        html += `
+            <div style="font-size:15px;">
+                <strong>Flat Balance:</strong>
+                <span style="color:var(--accent);font-weight:700;font-size:18px;">${fmtMoney(d.balance ?? 0)}</span>
+            </div>
+        `;
     }
 
-    html += `<div style="margin-top:12px;font-size:13px;color:var(--text-dim);">Key: <code>${d.key_masked}</code></div>`;
+    html += `
+        <div style="margin-top:16px;padding-top:16px;border-top:1px solid var(--border);font-size:13px;color:var(--text-dim);">
+            🔑 Key: <code style="background:rgba(99,102,241,0.1);padding:4px 8px;border-radius:6px;color:var(--accent);font-family:monospace;">${d.key_masked}</code>
+        </div>
+    `;
     html += '</div>';
     document.getElementById('planSection').innerHTML = `
         <div class="section-header"><h3>Thông tin gói</h3></div>
@@ -237,16 +257,16 @@ function renderSummary(summary, totals) {
             <td>${fmt(s.total_requests)}</td>
             <td>${fmtTokens(s.total_input_tokens)}</td>
             <td>${fmtTokens(s.total_output_tokens)}</td>
-            <td>${fmtMoney(s.total_cost)}</td>
+            <td><strong>${fmtMoney(s.total_cost)}</strong></td>
         </tr>
     `).join('');
     document.getElementById('summaryTotals').innerHTML = `
         <tr>
-            <td>Tổng</td>
-            <td>${fmt(totals.requests)}</td>
-            <td>${fmtTokens(totals.input_tokens)}</td>
-            <td>${fmtTokens(totals.output_tokens)}</td>
-            <td>${fmtMoney(totals.cost)}</td>
+            <td><strong>Tổng</strong></td>
+            <td><strong>${fmt(totals.requests)}</strong></td>
+            <td><strong>${fmtTokens(totals.input_tokens)}</strong></td>
+            <td><strong>${fmtTokens(totals.output_tokens)}</strong></td>
+            <td><strong>${fmtMoney(totals.cost)}</strong></td>
         </tr>
     `;
 }
@@ -272,10 +292,10 @@ function renderRecent(logs, pg) {
     tbody.innerHTML = logs.map(l => `
         <tr>
             <td>${new Date(l.created_at).toLocaleString('vi-VN')}</td>
-            <td>${l.model_display}</td>
+            <td><strong>${l.model_display}</strong></td>
             <td>${fmtTokens(l.input_tokens)}</td>
             <td>${fmtTokens(l.output_tokens)}</td>
-            <td>${fmtMoney(l.total_cost)}</td>
+            <td><strong>${fmtMoney(l.total_cost)}</strong></td>
         </tr>
     `).join('');
 
