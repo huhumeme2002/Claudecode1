@@ -646,6 +646,7 @@
                                 <th>Key</th>
                                 <th>Plan</th>
                                 <th>Balance</th>
+                                <th>Expiry</th>
                                 <th>Total Spent</th>
                                 <th>Status</th>
                                 <th>Actions</th>
@@ -809,6 +810,26 @@
                             <small>Budget resets after this many hours</small>
                         </div>
                     </div>
+                    <div class="form-group">
+                        <label for="durationDays">Thời hạn sử dụng</label>
+                        <select id="durationDays" name="durationDays" onchange="toggleCustomExpiry()">
+                            <option value="">Không giới hạn</option>
+                            <option value="1">1 ngày</option>
+                            <option value="3">3 ngày</option>
+                            <option value="7">7 ngày</option>
+                            <option value="14">14 ngày</option>
+                            <option value="30">30 ngày</option>
+                            <option value="90">90 ngày</option>
+                            <option value="365">365 ngày</option>
+                            <option value="custom">Tùy chỉnh</option>
+                        </select>
+                    </div>
+                    <div id="customExpiryField" style="display: none;">
+                        <div class="form-group">
+                            <label for="customExpiry">Ngày hết hạn</label>
+                            <input type="datetime-local" id="customExpiry" name="customExpiry">
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeCreateKeyModal()">Cancel</button>
@@ -842,6 +863,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=4"></script>
+    <script src="app.js?v=5"></script>
 </body>
 </html>

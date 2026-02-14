@@ -92,6 +92,15 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
       return res.status(401).json({ error: 'Missing API key' });
     }
 
+    // Expiry check
+    if (req.apiKey.expiry && new Date() > new Date(req.apiKey.expiry)) {
+      return res.status(403).json({
+        error: 'API key expired',
+        expired_at: req.apiKey.expiry,
+        message: 'This API key has expired. Please contact admin to renew.'
+      });
+    }
+
     const budget = getEffectiveBudget(req.apiKey);
     if (!budget.allowed) {
       if (budget.type === 'rate') {

@@ -358,7 +358,7 @@ function renderKeys() {
     if (state.keys.length === 0) {
         table.innerHTML = `
             <tr>
-                <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                     No API keys created. Click "Create Key" to get started.
                 </td>
             </tr>
@@ -379,12 +379,32 @@ function renderKeys() {
             balanceLabel = `$${key.balance.toFixed(2)}`;
         }
 
+        // Expiry display
+        let expiryLabel;
+        if (!key.expiry) {
+            expiryLabel = `<span style="color: var(--text-secondary);">Không giới hạn</span>`;
+        } else {
+            const now = new Date();
+            const exp = new Date(key.expiry);
+            const diffMs = exp.getTime() - now.getTime();
+            const diffDays = Math.ceil(diffMs / 86400000);
+            if (diffMs <= 0) {
+                const agoD = Math.abs(diffDays);
+                expiryLabel = `<span style="color: var(--danger);">Hết hạn ${agoD} ngày trước</span>`;
+            } else if (diffDays <= 3) {
+                expiryLabel = `<span style="color: var(--warning);">Còn ${diffDays} ngày</span>`;
+            } else {
+                expiryLabel = `<span style="color: var(--success);">Còn ${diffDays} ngày</span>`;
+            }
+        }
+
         return `
         <tr>
             <td><strong>${key.name}</strong></td>
             <td><code>${key.key}</code></td>
             <td>${planLabel}</td>
             <td>${balanceLabel}</td>
+            <td>${expiryLabel}</td>
             <td>$${key.totalSpent.toFixed(2)}</td>
             <td>
                 <span class="badge badge-${key.enabled ? 'success' : 'danger'}">
@@ -395,6 +415,7 @@ function renderKeys() {
                 <div class="actions">
                     ${!isRate ? `<button class="btn btn-sm btn-success" onclick="addBalance('${key.id}', '${key.name}')">Add Balance</button>
                     <button class="btn btn-sm btn-secondary" onclick="setBalance('${key.id}', '${key.name}')">Set Balance</button>` : ''}
+                    <button class="btn btn-sm btn-primary" onclick="extendKey('${key.id}', '${key.name}')">Gia hạn</button>
                     <button class="btn btn-sm btn-danger" onclick="deleteKey('${key.id}', '${key.name}')">Delete</button>
                 </div>
             </td>
@@ -430,6 +451,11 @@ function toggleBillingType() {
     document.getElementById('rateLimitIntervalHours').required = isRate;
 }
 
+function toggleCustomExpiry() {
+    const val = document.getElementById('durationDays').value;
+    document.getElementById('customExpiryField').style.display = val === 'custom' ? 'block' : 'none';
+}
+
 async function createKey(formData) {
     const createKeyBtn = document.getElementById('createKeyBtnText');
     const createKeyLoading = document.getElementById('createKeyBtnLoading');
@@ -446,6 +472,17 @@ async function createKey(formData) {
             payload.rateLimitIntervalHours = parseFloat(formData.get('rateLimitIntervalHours'));
         } else {
             payload.balance = parseFloat(formData.get('balance'));
+        }
+
+        // Expiry
+        const durationVal = formData.get('durationDays');
+        if (durationVal === 'custom') {
+            const customExpiry = formData.get('customExpiry');
+            if (customExpiry) {
+                payload.expiry = new Date(customExpiry).toISOString();
+            }
+        } else if (durationVal) {
+            payload.duration_days = parseInt(durationVal);
         }
 
         const data = await apiRequest('/api/admin/keys/create', {
@@ -519,6 +556,28 @@ async function setBalance(id, name) {
         loadKeys();
     } catch (error) {
         showAlert('keysAlert', 'Failed to set balance: ' + error.message, 'error');
+    }
+}
+
+async function extendKey(id, name) {
+    const days = prompt(`Gia hạn "${name}" thêm bao nhiêu ngày?`);
+    if (!days || isNaN(days) || parseInt(days) <= 0) {
+        return;
+    }
+
+    try {
+        const data = await apiRequest('/api/admin/keys/extend', {
+            method: 'POST',
+            body: JSON.stringify({
+                key_id: id,
+                duration_days: parseInt(days)
+            })
+        });
+        const newExp = new Date(data.data.new_expiry).toLocaleDateString('vi-VN');
+        showAlert('keysAlert', `Đã gia hạn thành công. Hạn mới: ${newExp}`, 'success');
+        loadKeys();
+    } catch (error) {
+        showAlert('keysAlert', 'Gia hạn thất bại: ' + error.message, 'error');
     }
 }
 

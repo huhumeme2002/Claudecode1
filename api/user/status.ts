@@ -21,11 +21,25 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       },
     });
 
+    const now = new Date();
+    const expiryDate = req.apiKey.expiry ? new Date(req.apiKey.expiry) : null;
+    let daysRemaining: number | null = null;
+    let expired = false;
+
+    if (expiryDate) {
+      const diffMs = expiryDate.getTime() - now.getTime();
+      daysRemaining = Math.ceil(diffMs / 86400_000);
+      expired = diffMs <= 0;
+    }
+
     res.json({
       name: req.apiKey.name,
       balance: req.apiKey.balance,
       totalSpent: usageStats._sum.cost || 0,
       totalTokens: (usageStats._sum.inputTokens || 0) + (usageStats._sum.outputTokens || 0),
+      expiry: req.apiKey.expiry,
+      days_remaining: daysRemaining,
+      expired,
     });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch status' });

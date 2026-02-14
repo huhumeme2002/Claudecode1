@@ -7,6 +7,7 @@ export interface AuthenticatedRequest extends Request {
     key: string;
     balance: number;
     enabled: boolean;
+    expiry: Date | null;
     rateLimitAmount: number | null;
     rateLimitIntervalHours: number | null;
     rateLimitWindowStart: Date | null;

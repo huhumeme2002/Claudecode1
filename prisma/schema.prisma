@@ -15,6 +15,7 @@ model ApiKey {
   totalSpent             Float      @default(0) @map("total_spent")
   totalTokens            BigInt     @default(0) @map("total_tokens")
   enabled                Boolean    @default(true)
+  expiry                 DateTime?  @map("expiry")
   rateLimitAmount        Float?     @map("rate_limit_amount")
   rateLimitIntervalHours Float?     @map("rate_limit_interval_hours")
   rateLimitWindowStart   DateTime?  @map("rate_limit_window_start")

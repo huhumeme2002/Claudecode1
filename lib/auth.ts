@@ -47,6 +47,7 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
       key: apiKey.key,
       balance: apiKey.balance,
       enabled: apiKey.enabled,
+      expiry: apiKey.expiry,
       rateLimitAmount: apiKey.rateLimitAmount,
       rateLimitIntervalHours: apiKey.rateLimitIntervalHours,
       rateLimitWindowStart: apiKey.rateLimitWindowStart,
