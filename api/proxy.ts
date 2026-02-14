@@ -261,9 +261,9 @@ async function handleStreamingResponse(
         // Parse tokens from chunk
         parser.processChunk(chunk);
 
-        // Debug: log first chunk to see what model name is in the stream
-        if (chunk.includes('"type":"message_start"')) {
-          logger.info(`[${correlationId}] First message_start chunk (first 500 chars): ${chunk.substring(0, 500)}`);
+        // Debug: log all chunks that contain "model" to see format
+        if (chunk.includes('"model"')) {
+          logger.info(`[${correlationId}] Chunk with model field: ${chunk.substring(0, 800)}`);
         }
 
         // Rewrite model name back to display name before forwarding
