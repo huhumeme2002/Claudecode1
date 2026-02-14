@@ -183,7 +183,7 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
     }
 
     // Debug: log all upstream response headers
-    logger.debug(`[${correlationId}] Upstream response headers:`, Object.fromEntries(upstreamResponse.headers.entries()));
+    logger.info(`[${correlationId}] Upstream response headers:`, Object.fromEntries(upstreamResponse.headers.entries()));
 
     // Handle streaming response
     if (isStreaming) {
@@ -216,7 +216,7 @@ async function handleStreamingResponse(
 
   // Copy upstream headers but rewrite model-related ones
   const headerEntries = Array.from(upstreamResponse.headers.entries());
-  logger.debug(`[${correlationId}] Checking ${headerEntries.length} upstream headers for model rewrite`);
+  logger.info(`[${correlationId}] Checking ${headerEntries.length} upstream headers for model rewrite`);
 
   upstreamResponse.headers.forEach((value, key) => {
     const lowerKey = key.toLowerCase();
@@ -313,7 +313,7 @@ async function handleNonStreamingResponse(
 
   // Copy upstream headers but rewrite model-related ones
   const headerEntries = Array.from(upstreamResponse.headers.entries());
-  logger.debug(`[${correlationId}] Checking ${headerEntries.length} upstream headers for model rewrite`);
+  logger.info(`[${correlationId}] Checking ${headerEntries.length} upstream headers for model rewrite`);
 
   upstreamResponse.headers.forEach((value, key) => {
     const lowerKey = key.toLowerCase();
