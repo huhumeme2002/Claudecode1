@@ -88,10 +88,16 @@ function rewriteModelInChunk(chunk: string, actualModel: string, displayName: st
 
   const lines = chunk.split('\n');
   let rewritten = false;
+
   for (let i = 0; i < lines.length; i++) {
-    if (!lines[i].startsWith('data: ')) continue;
-    const jsonStr = lines[i].slice(6).trim();
-    if (jsonStr === '[DONE]') continue;
+    const line = lines[i];
+
+    // Skip event: lines, only process data: lines
+    if (!line.startsWith('data: ')) continue;
+
+    const jsonStr = line.slice(6).trim();
+    if (jsonStr === '[DONE]' || !jsonStr) continue;
+
     try {
       const parsed = JSON.parse(jsonStr);
 
@@ -112,6 +118,7 @@ function rewriteModelInChunk(chunk: string, actualModel: string, displayName: st
       // not valid JSON, skip
     }
   }
+
   if (rewritten) {
     logger.info(`Rewrote model in chunk: ${actualModel} → ${displayName}`);
   }
