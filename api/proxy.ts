@@ -82,6 +82,28 @@ function buildHeaders(apiFormat: string, apiKey: string): Record<string, string>
   return headers;
 }
 
+// Helper to replace model name in an SSE chunk (swap actual model back to display name)
+function rewriteModelInChunk(chunk: string, actualModel: string, displayName: string): string {
+  if (!chunk.includes(actualModel)) return chunk;
+
+  const lines = chunk.split('\n');
+  for (let i = 0; i < lines.length; i++) {
+    if (!lines[i].startsWith('data: ')) continue;
+    const jsonStr = lines[i].slice(6).trim();
+    if (jsonStr === '[DONE]') continue;
+    try {
+      const parsed = JSON.parse(jsonStr);
+      if (parsed.model === actualModel) {
+        parsed.model = displayName;
+        lines[i] = 'data: ' + JSON.stringify(parsed);
+      }
+    } catch {
+      // not valid JSON, skip
+    }
+  }
+  return lines.join('\n');
+}
+
 // Core proxy handler
 async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath: string) {
   const correlationId = randomUUID();
@@ -157,11 +179,11 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
 
     // Handle streaming response
     if (isStreaming) {
-      return handleStreamingResponse(req, res, upstreamResponse, model, correlationId, budget.type);
+      return handleStreamingResponse(req, res, upstreamResponse, model, requestedModel, correlationId, budget.type);
     }
 
     // Handle non-streaming response
-    return handleNonStreamingResponse(req, res, upstreamResponse, model, correlationId, budget.type);
+    return handleNonStreamingResponse(req, res, upstreamResponse, model, requestedModel, correlationId, budget.type);
 
   } catch (error: any) {
     logger.error(`[${correlationId}] Proxy error:`, error);
@@ -175,6 +197,7 @@ async function handleStreamingResponse(
   res: Response,
   upstreamResponse: globalThis.Response,
   model: any,
+  displayName: string,
   correlationId: string,
   billingType: 'flat' | 'rate'
 ) {
@@ -209,8 +232,11 @@ async function handleStreamingResponse(
         // Parse tokens from chunk
         parser.processChunk(chunk);
 
+        // Rewrite model name back to display name before forwarding
+        const rewritten = rewriteModelInChunk(chunk, model.actualModel, displayName);
+
         // Forward chunk to client
-        res.write(chunk);
+        res.write(rewritten);
       }
     }
 
@@ -253,10 +279,16 @@ async function handleNonStreamingResponse(
   res: Response,
   upstreamResponse: globalThis.Response,
   model: any,
+  displayName: string,
   correlationId: string,
   billingType: 'flat' | 'rate'
 ) {
-  const responseBody = await upstreamResponse.json();
+  const responseBody: any = await upstreamResponse.json();
+
+  // Swap model name back to display name
+  if (responseBody.model) {
+    responseBody.model = displayName;
+  }
 
   // Parse token usage based on format
   let usage: TokenUsage;
