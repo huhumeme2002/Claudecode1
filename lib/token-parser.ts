@@ -19,33 +19,49 @@ export class StreamTokenParser {
   private format: 'openai' | 'anthropic';
   private inputTokens = 0;
   private outputTokens = 0;
+  private buffer = '';
 
   constructor(format: 'openai' | 'anthropic') {
     this.format = format;
   }
 
-  processChunk(data: string): void {
-    try {
-      if (this.format === 'openai') {
-        this.processOpenAIChunk(data);
-      } else {
-        this.processAnthropicChunk(data);
+  processChunk(rawChunk: string): void {
+    this.buffer += rawChunk;
+
+    // Split on double newline (SSE event boundary)
+    const parts = this.buffer.split('\n\n');
+    // Keep the last incomplete part in buffer
+    this.buffer = parts.pop() || '';
+
+    for (const part of parts) {
+      const lines = part.split('\n');
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const jsonStr = line.slice(6).trim();
+        if (jsonStr === '[DONE]') continue;
+
+        try {
+          const parsed = JSON.parse(jsonStr);
+          if (this.format === 'openai') {
+            this.processOpenAIEvent(parsed);
+          } else {
+            this.processAnthropicEvent(parsed);
+          }
+        } catch {
+          // Ignore malformed JSON
+        }
       }
-    } catch {
-      // Ignore parse errors in stream chunks
     }
   }
 
-  private processOpenAIChunk(data: string): void {
-    const parsed = JSON.parse(data);
+  private processOpenAIEvent(parsed: any): void {
     if (parsed.usage) {
       this.inputTokens = parsed.usage.prompt_tokens ?? this.inputTokens;
       this.outputTokens = parsed.usage.completion_tokens ?? this.outputTokens;
     }
   }
 
-  private processAnthropicChunk(data: string): void {
-    const parsed = JSON.parse(data);
+  private processAnthropicEvent(parsed: any): void {
     if (parsed.type === 'message_start' && parsed.message?.usage) {
       this.inputTokens = parsed.message.usage.input_tokens ?? 0;
     }
