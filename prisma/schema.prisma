@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ApiKey {
+  id          String     @id @default(uuid())
+  name        String
+  key         String     @unique
+  balance     Float      @default(0)
+  totalSpent  Float      @default(0) @map("total_spent")
+  totalTokens BigInt     @default(0) @map("total_tokens")
+  enabled     Boolean    @default(true)
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  usageLogs   UsageLog[]
+
+  @@map("api_keys")
+}
+
+model ModelMapping {
+  id            String     @id @default(uuid())
+  displayName   String     @unique @map("display_name")
+  actualModel   String     @map("actual_model")
+  apiUrl        String     @map("api_url")
+  apiKey        String     @map("api_key")
+  apiFormat     String     @map("api_format")
+  inputPrice    Float      @map("input_price")
+  outputPrice   Float      @map("output_price")
+  systemPrompt  String?    @map("system_prompt")
+  disableSystem Boolean    @default(false) @map("disable_system")
+  enabled       Boolean    @default(true)
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  usageLogs     UsageLog[]
+
+  @@map("model_mappings")
+}
+
+model UsageLog {
+  id            String       @id @default(uuid())
+  apiKeyId      String       @map("api_key_id")
+  modelId       String       @map("model_id")
+  inputTokens   Int          @map("input_tokens")
+  outputTokens  Int          @map("output_tokens")
+  cost          Float
+  balanceBefore Float        @map("balance_before")
+  balanceAfter  Float        @map("balance_after")
+  createdAt     DateTime     @default(now()) @map("created_at")
+  apiKey        ApiKey       @relation(fields: [apiKeyId], references: [id])
+  model         ModelMapping @relation(fields: [modelId], references: [id])
+
+  @@map("usage_logs")
+}
+
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
+}
