@@ -47,6 +47,10 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
       key: apiKey.key,
       balance: apiKey.balance,
       enabled: apiKey.enabled,
+      rateLimitAmount: apiKey.rateLimitAmount,
+      rateLimitIntervalHours: apiKey.rateLimitIntervalHours,
+      rateLimitWindowStart: apiKey.rateLimitWindowStart,
+      rateLimitWindowSpent: apiKey.rateLimitWindowSpent,
     };
     next();
   } catch (err) {

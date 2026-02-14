@@ -358,7 +358,7 @@ function renderKeys() {
     if (state.keys.length === 0) {
         table.innerHTML = `
             <tr>
-                <td colspan="6" style="text-align: center; padding: 40px; color: var(--text-secondary);">
+                <td colspan="7" style="text-align: center; padding: 40px; color: var(--text-secondary);">
                     No API keys created. Click "Create Key" to get started.
                 </td>
             </tr>
@@ -366,11 +366,25 @@ function renderKeys() {
         return;
     }
 
-    table.innerHTML = state.keys.map(key => `
+    table.innerHTML = state.keys.map(key => {
+        const isRate = key.rateLimitAmount != null && key.rateLimitIntervalHours != null;
+        let planLabel, balanceLabel;
+
+        if (isRate) {
+            const spent = key.rateLimitWindowSpent || 0;
+            planLabel = `<span class="badge badge-success">Rate</span>`;
+            balanceLabel = `$${key.rateLimitAmount.toFixed(2)}/${key.rateLimitIntervalHours}h ($${spent.toFixed(2)} spent)`;
+        } else {
+            planLabel = `<span class="badge badge-success">Flat</span>`;
+            balanceLabel = `$${key.balance.toFixed(2)}`;
+        }
+
+        return `
         <tr>
             <td><strong>${key.name}</strong></td>
             <td><code>${key.key}</code></td>
-            <td>$${key.balance.toFixed(2)}</td>
+            <td>${planLabel}</td>
+            <td>${balanceLabel}</td>
             <td>$${key.totalSpent.toFixed(2)}</td>
             <td>
                 <span class="badge badge-${key.enabled ? 'success' : 'danger'}">
@@ -379,13 +393,13 @@ function renderKeys() {
             </td>
             <td>
                 <div class="actions">
-                    <button class="btn btn-sm btn-success" onclick="addBalance('${key.id}', '${key.name}')">Add Balance</button>
-                    <button class="btn btn-sm btn-secondary" onclick="setBalance('${key.id}', '${key.name}')">Set Balance</button>
+                    ${!isRate ? `<button class="btn btn-sm btn-success" onclick="addBalance('${key.id}', '${key.name}')">Add Balance</button>
+                    <button class="btn btn-sm btn-secondary" onclick="setBalance('${key.id}', '${key.name}')">Set Balance</button>` : ''}
                     <button class="btn btn-sm btn-danger" onclick="deleteKey('${key.id}', '${key.name}')">Delete</button>
                 </div>
             </td>
         </tr>
-    `).join('');
+    `}).join('');
 }
 
 function maskKey(key) {
@@ -395,11 +409,25 @@ function maskKey(key) {
 
 function openCreateKeyModal() {
     document.getElementById('createKeyModal').classList.add('active');
+    // Reset to flat billing type
+    document.querySelector('input[name="billingType"][value="flat"]').checked = true;
+    toggleBillingType();
 }
 
 function closeCreateKeyModal() {
     document.getElementById('createKeyModal').classList.remove('active');
     document.getElementById('createKeyForm').reset();
+}
+
+function toggleBillingType() {
+    const isRate = document.querySelector('input[name="billingType"]:checked').value === 'rate';
+    document.getElementById('flatFields').style.display = isRate ? 'none' : 'block';
+    document.getElementById('rateFields').style.display = isRate ? 'block' : 'none';
+
+    // Toggle required attributes
+    document.getElementById('initialBalance').required = !isRate;
+    document.getElementById('rateLimitAmount').required = isRate;
+    document.getElementById('rateLimitIntervalHours').required = isRate;
 }
 
 async function createKey(formData) {
@@ -410,12 +438,19 @@ async function createKey(formData) {
         createKeyBtn.classList.add('hidden');
         createKeyLoading.classList.remove('hidden');
 
+        const billingType = formData.get('billingType');
+        const payload = { name: formData.get('name') };
+
+        if (billingType === 'rate') {
+            payload.rateLimitAmount = parseFloat(formData.get('rateLimitAmount'));
+            payload.rateLimitIntervalHours = parseFloat(formData.get('rateLimitIntervalHours'));
+        } else {
+            payload.balance = parseFloat(formData.get('balance'));
+        }
+
         const data = await apiRequest('/api/admin/keys/create', {
             method: 'POST',
-            body: JSON.stringify({
-                name: formData.get('name'),
-                balance: parseFloat(formData.get('balance'))
-            })
+            body: JSON.stringify(payload)
         });
 
         closeCreateKeyModal();

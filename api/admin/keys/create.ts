@@ -8,10 +8,17 @@ const router = Router();
 
 router.post('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { name, balance } = req.body;
+    const { name, balance, rateLimitAmount, rateLimitIntervalHours } = req.body;
 
     if (!name) {
       res.status(400).json({ error: 'Missing name field' });
+      return;
+    }
+
+    const isRatePlan = rateLimitAmount != null && rateLimitIntervalHours != null;
+
+    if (isRatePlan && (rateLimitAmount <= 0 || rateLimitIntervalHours <= 0)) {
+      res.status(400).json({ error: 'Rate limit amount and interval must be positive' });
       return;
     }
 
@@ -22,8 +29,13 @@ router.post('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =
         id: generateId(),
         name,
         key,
-        balance: balance || 0,
+        balance: isRatePlan ? 0 : (balance || 0),
         enabled: true,
+        ...(isRatePlan ? {
+          rateLimitAmount: parseFloat(rateLimitAmount),
+          rateLimitIntervalHours: parseFloat(rateLimitIntervalHours),
+          rateLimitWindowSpent: 0,
+        } : {}),
       },
     });
 

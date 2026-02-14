@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { verifyApiKey } from '../lib/auth';
 import { getModelByDisplayName, getSetting } from '../lib/cache';
-import { calculateCost, deductAndLog } from '../lib/billing';
+import { calculateCost, deductAndLog, getEffectiveBudget } from '../lib/billing';
 import { StreamTokenParser, parseOpenAIResponse, parseAnthropicResponse } from '../lib/token-parser';
 import { AuthenticatedRequest, TokenUsage } from '../lib/types';
 import logger from '../lib/logger';
@@ -88,7 +88,18 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
 
   try {
     // Balance check
-    if (!req.apiKey || req.apiKey.balance <= 0) {
+    if (!req.apiKey) {
+      return res.status(401).json({ error: 'Missing API key' });
+    }
+
+    const budget = getEffectiveBudget(req.apiKey);
+    if (!budget.allowed) {
+      if (budget.type === 'rate') {
+        return res.status(429).json({
+          error: 'Rate budget exhausted',
+          message: `Budget limit reached. Resets at ${budget.windowResetAt!.toISOString()}`,
+        });
+      }
       return res.status(402).json({ error: 'Insufficient balance' });
     }
 
@@ -137,11 +148,11 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
 
     // Handle streaming response
     if (isStreaming) {
-      return handleStreamingResponse(req, res, upstreamResponse, model, correlationId);
+      return handleStreamingResponse(req, res, upstreamResponse, model, correlationId, budget.type);
     }
 
     // Handle non-streaming response
-    return handleNonStreamingResponse(req, res, upstreamResponse, model, correlationId);
+    return handleNonStreamingResponse(req, res, upstreamResponse, model, correlationId, budget.type);
 
   } catch (error: any) {
     logger.error(`[${correlationId}] Proxy error:`, error);
@@ -155,7 +166,8 @@ async function handleStreamingResponse(
   res: Response,
   upstreamResponse: globalThis.Response,
   model: any,
-  correlationId: string
+  correlationId: string,
+  billingType: 'flat' | 'rate'
 ) {
   // Set SSE headers
   res.setHeader('Content-Type', 'text/event-stream');
@@ -208,10 +220,11 @@ async function handleStreamingResponse(
         modelId: model.id,
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
-        cost
+        cost,
+        type: billingType
       });
 
-      logger.info(`[${correlationId}] Deducted $${cost.toFixed(6)} from key ${req.apiKey!.id}`);
+      logger.info(`[${correlationId}] Deducted $${cost.toFixed(6)} from key ${req.apiKey!.id} (${billingType})`);
     } else {
       logger.warn(`[${correlationId}] No token usage found in stream`);
     }
@@ -231,7 +244,8 @@ async function handleNonStreamingResponse(
   res: Response,
   upstreamResponse: globalThis.Response,
   model: any,
-  correlationId: string
+  correlationId: string,
+  billingType: 'flat' | 'rate'
 ) {
   const responseBody = await upstreamResponse.json();
 
@@ -254,10 +268,11 @@ async function handleNonStreamingResponse(
       modelId: model.id,
       inputTokens: usage.inputTokens,
       outputTokens: usage.outputTokens,
-      cost
+      cost,
+      type: billingType
     });
 
-    logger.info(`[${correlationId}] Deducted $${cost.toFixed(6)} from key ${req.apiKey!.id}`);
+    logger.info(`[${correlationId}] Deducted $${cost.toFixed(6)} from key ${req.apiKey!.id} (${billingType})`);
   } else {
     logger.warn(`[${correlationId}] No token usage found in response`);
   }

@@ -18,6 +18,10 @@ router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =>
         ? `${key.key.slice(0, 7)}...${key.key.slice(-4)}`
         : key.key,
       totalTokens: Number(key.totalTokens),
+      rateLimitAmount: key.rateLimitAmount,
+      rateLimitIntervalHours: key.rateLimitIntervalHours,
+      rateLimitWindowStart: key.rateLimitWindowStart,
+      rateLimitWindowSpent: key.rateLimitWindowSpent,
     }));
 
     res.json(result);

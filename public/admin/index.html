@@ -644,6 +644,7 @@
                             <tr>
                                 <th>Name</th>
                                 <th>Key</th>
+                                <th>Plan</th>
                                 <th>Balance</th>
                                 <th>Total Spent</th>
                                 <th>Status</th>
@@ -780,8 +781,33 @@
                         <small>Descriptive name for this API key</small>
                     </div>
                     <div class="form-group">
-                        <label for="initialBalance">Initial Balance ($)</label>
-                        <input type="number" id="initialBalance" name="balance" step="0.01" min="0" required>
+                        <label>Billing Type</label>
+                        <div style="display: flex; gap: 20px; margin-top: 5px;">
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: normal;">
+                                <input type="radio" name="billingType" value="flat" checked onchange="toggleBillingType()"> Flat Balance
+                            </label>
+                            <label style="display: flex; align-items: center; gap: 6px; cursor: pointer; font-weight: normal;">
+                                <input type="radio" name="billingType" value="rate" onchange="toggleBillingType()"> Rate Plan
+                            </label>
+                        </div>
+                    </div>
+                    <div id="flatFields">
+                        <div class="form-group">
+                            <label for="initialBalance">Initial Balance ($)</label>
+                            <input type="number" id="initialBalance" name="balance" step="0.01" min="0" required>
+                        </div>
+                    </div>
+                    <div id="rateFields" style="display: none;">
+                        <div class="form-group">
+                            <label for="rateLimitAmount">Budget per Window ($)</label>
+                            <input type="number" id="rateLimitAmount" name="rateLimitAmount" step="0.01" min="0.01">
+                            <small>Dollar amount available per time window</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="rateLimitIntervalHours">Window Interval (hours)</label>
+                            <input type="number" id="rateLimitIntervalHours" name="rateLimitIntervalHours" step="0.1" min="0.1">
+                            <small>Budget resets after this many hours</small>
+                        </div>
                     </div>
                 </div>
                 <div class="modal-footer">
@@ -816,6 +842,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=3"></script>
+    <script src="app.js?v=4"></script>
 </body>
 </html>
