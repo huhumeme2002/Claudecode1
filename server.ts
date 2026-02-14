@@ -55,6 +55,9 @@ try {
 
 // Admin SPA fallback
 app.get('/admin', (_req, res) => {
+  res.redirect('/admin/');
+});
+app.get('/admin/', (_req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
 });
 app.get('/admin/*', (_req, res) => {
