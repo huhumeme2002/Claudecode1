@@ -94,8 +94,17 @@ function rewriteModelInChunk(chunk: string, actualModel: string, displayName: st
     if (jsonStr === '[DONE]') continue;
     try {
       const parsed = JSON.parse(jsonStr);
+
+      // OpenAI format: top-level model field
       if (parsed.model === actualModel) {
         parsed.model = displayName;
+        lines[i] = 'data: ' + JSON.stringify(parsed);
+        rewritten = true;
+      }
+
+      // Anthropic format: message_start event has message.model
+      if (parsed.type === 'message_start' && parsed.message?.model === actualModel) {
+        parsed.message.model = displayName;
         lines[i] = 'data: ' + JSON.stringify(parsed);
         rewritten = true;
       }
@@ -104,7 +113,7 @@ function rewriteModelInChunk(chunk: string, actualModel: string, displayName: st
     }
   }
   if (rewritten) {
-    logger.debug(`Rewrote model in chunk: ${actualModel} → ${displayName}`);
+    logger.info(`Rewrote model in chunk: ${actualModel} → ${displayName}`);
   }
   return lines.join('\n');
 }
