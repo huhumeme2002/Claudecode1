@@ -182,6 +182,9 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
       return res.status(upstreamResponse.status).send(errorBody);
     }
 
+    // Debug: log all upstream response headers
+    logger.debug(`[${correlationId}] Upstream response headers:`, Object.fromEntries(upstreamResponse.headers.entries()));
+
     // Handle streaming response
     if (isStreaming) {
       return handleStreamingResponse(req, res, upstreamResponse, model, requestedModel, correlationId, budget.type);
@@ -212,8 +215,13 @@ async function handleStreamingResponse(
   res.setHeader('Connection', 'keep-alive');
 
   // Copy upstream headers but rewrite model-related ones
+  const headerEntries = Array.from(upstreamResponse.headers.entries());
+  logger.debug(`[${correlationId}] Checking ${headerEntries.length} upstream headers for model rewrite`);
+
   upstreamResponse.headers.forEach((value, key) => {
-    if (key.toLowerCase() === 'x-model-id' || key.toLowerCase() === 'anthropic-model') {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === 'x-model-id' || lowerKey === 'anthropic-model' || lowerKey.includes('model')) {
+      logger.info(`[${correlationId}] Rewriting header ${key}: ${value} → ${displayName}`);
       res.setHeader(key, displayName);
     }
   });
@@ -304,8 +312,13 @@ async function handleNonStreamingResponse(
   }
 
   // Copy upstream headers but rewrite model-related ones
+  const headerEntries = Array.from(upstreamResponse.headers.entries());
+  logger.debug(`[${correlationId}] Checking ${headerEntries.length} upstream headers for model rewrite`);
+
   upstreamResponse.headers.forEach((value, key) => {
-    if (key.toLowerCase() === 'x-model-id' || key.toLowerCase() === 'anthropic-model') {
+    const lowerKey = key.toLowerCase();
+    if (lowerKey === 'x-model-id' || lowerKey === 'anthropic-model' || lowerKey.includes('model')) {
+      logger.info(`[${correlationId}] Rewriting header ${key}: ${value} → ${displayName}`);
       res.setHeader(key, displayName);
     }
   });
