@@ -185,8 +185,8 @@ function renderDashboard() {
             <tr>
                 <td>${row.date}</td>
                 <td>${row.requests}</td>
-                <td>${row.tokens.toLocaleString()}</td>
-                <td>-</td>
+                <td>${(row.inputTokens || 0).toLocaleString()}</td>
+                <td>${(row.outputTokens || 0).toLocaleString()}</td>
                 <td>$${row.cost.toFixed(4)}</td>
             </tr>
         `).join('');

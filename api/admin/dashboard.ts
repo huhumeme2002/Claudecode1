@@ -34,13 +34,14 @@ router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =>
     });
 
     // Group by date
-    const usageByDate = new Map<string, { requests: number; tokens: number; cost: number }>();
+    const usageByDate = new Map<string, { requests: number; inputTokens: number; outputTokens: number; cost: number }>();
 
     recentLogs.forEach((log) => {
       const date = log.createdAt.toISOString().split('T')[0];
-      const existing = usageByDate.get(date) || { requests: 0, tokens: 0, cost: 0 };
+      const existing = usageByDate.get(date) || { requests: 0, inputTokens: 0, outputTokens: 0, cost: 0 };
       existing.requests += 1;
-      existing.tokens += log.inputTokens + log.outputTokens;
+      existing.inputTokens += log.inputTokens;
+      existing.outputTokens += log.outputTokens;
       existing.cost += log.cost;
       usageByDate.set(date, existing);
     });
