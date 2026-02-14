@@ -2,6 +2,7 @@ const state = {
     apiKey: localStorage.getItem('userApiKey'),
     status: null,
     recentPage: 1,
+    refreshInterval: null,
 };
 
 async function api(endpoint, opts = {}) {
@@ -53,6 +54,7 @@ async function login() {
 function logout() {
     state.apiKey = null;
     localStorage.removeItem('userApiKey');
+    if (state.refreshInterval) { clearInterval(state.refreshInterval); state.refreshInterval = null; }
     document.getElementById('loginPage').classList.remove('hidden');
     document.getElementById('mainApp').classList.add('hidden');
 }
@@ -69,6 +71,9 @@ function showApp() {
     document.getElementById('loginPage').classList.add('hidden');
     document.getElementById('mainApp').classList.remove('hidden');
     loadAll();
+    // Auto-refresh mỗi 30 giây
+    if (state.refreshInterval) clearInterval(state.refreshInterval);
+    state.refreshInterval = setInterval(() => loadAll(), 30000);
 }
 
 async function loadAll() {
