@@ -211,6 +211,13 @@ async function handleStreamingResponse(
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
+  // Copy upstream headers but rewrite model-related ones
+  upstreamResponse.headers.forEach((value, key) => {
+    if (key.toLowerCase() === 'x-model-id' || key.toLowerCase() === 'anthropic-model') {
+      res.setHeader(key, displayName);
+    }
+  });
+
   const parser = new StreamTokenParser(model.apiFormat);
   const reader = upstreamResponse.body?.getReader();
   const decoder = new TextDecoder();
@@ -295,6 +302,13 @@ async function handleNonStreamingResponse(
     logger.info(`[${correlationId}] Rewriting model in non-stream response: ${responseBody.model} → ${displayName}`);
     responseBody.model = displayName;
   }
+
+  // Copy upstream headers but rewrite model-related ones
+  upstreamResponse.headers.forEach((value, key) => {
+    if (key.toLowerCase() === 'x-model-id' || key.toLowerCase() === 'anthropic-model') {
+      res.setHeader(key, displayName);
+    }
+  });
 
   // Parse token usage based on format
   let usage: TokenUsage;
