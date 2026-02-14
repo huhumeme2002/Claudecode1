@@ -84,7 +84,8 @@ function buildHeaders(apiFormat: string, apiKey: string): Record<string, string>
 
 // Helper to replace model name in an SSE chunk (swap actual model back to display name)
 function rewriteModelInChunk(chunk: string, actualModel: string, displayName: string): string {
-  if (!chunk.includes(actualModel)) return chunk;
+  const actualModelLower = actualModel.toLowerCase();
+  if (!chunk.toLowerCase().includes(actualModelLower)) return chunk;
 
   const lines = chunk.split('\n');
   let rewritten = false;
@@ -101,15 +102,16 @@ function rewriteModelInChunk(chunk: string, actualModel: string, displayName: st
     try {
       const parsed = JSON.parse(jsonStr);
 
-      // OpenAI format: top-level model field
-      if (parsed.model === actualModel) {
+      // OpenAI format: top-level model field (case-insensitive)
+      if (parsed.model && parsed.model.toLowerCase() === actualModelLower) {
         parsed.model = displayName;
         lines[i] = 'data: ' + JSON.stringify(parsed);
         rewritten = true;
       }
 
-      // Anthropic format: message_start event has message.model
-      if (parsed.type === 'message_start' && parsed.message?.model === actualModel) {
+      // Anthropic format: message_start event has message.model (case-insensitive)
+      if (parsed.type === 'message_start' && parsed.message?.model &&
+          parsed.message.model.toLowerCase() === actualModelLower) {
         parsed.message.model = displayName;
         lines[i] = 'data: ' + JSON.stringify(parsed);
         rewritten = true;
