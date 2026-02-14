@@ -87,6 +87,7 @@ function rewriteModelInChunk(chunk: string, actualModel: string, displayName: st
   if (!chunk.includes(actualModel)) return chunk;
 
   const lines = chunk.split('\n');
+  let rewritten = false;
   for (let i = 0; i < lines.length; i++) {
     if (!lines[i].startsWith('data: ')) continue;
     const jsonStr = lines[i].slice(6).trim();
@@ -96,10 +97,14 @@ function rewriteModelInChunk(chunk: string, actualModel: string, displayName: st
       if (parsed.model === actualModel) {
         parsed.model = displayName;
         lines[i] = 'data: ' + JSON.stringify(parsed);
+        rewritten = true;
       }
     } catch {
       // not valid JSON, skip
     }
+  }
+  if (rewritten) {
+    logger.debug(`Rewrote model in chunk: ${actualModel} → ${displayName}`);
   }
   return lines.join('\n');
 }
@@ -287,6 +292,7 @@ async function handleNonStreamingResponse(
 
   // Swap model name back to display name
   if (responseBody.model) {
+    logger.info(`[${correlationId}] Rewriting model in non-stream response: ${responseBody.model} → ${displayName}`);
     responseBody.model = displayName;
   }
 
