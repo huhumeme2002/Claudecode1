@@ -142,36 +142,37 @@ async function loadDashboard() {
 }
 
 function renderDashboard() {
-    const { stats, recentUsage } = state.dashboard;
+    const data = state.dashboard;
 
     // Render stats cards
     const statsGrid = document.getElementById('statsGrid');
     statsGrid.innerHTML = `
         <div class="stat-card">
             <h3>Total API Keys</h3>
-            <div class="value">${stats?.totalKeys || 0}</div>
+            <div class="value">${data.totalKeys || 0}</div>
         </div>
         <div class="stat-card">
             <h3>Active Keys</h3>
-            <div class="value">${stats?.activeKeys || 0}</div>
+            <div class="value">${data.activeKeys || 0}</div>
         </div>
         <div class="stat-card">
             <h3>Total Models</h3>
-            <div class="value">${stats?.totalModels || 0}</div>
+            <div class="value">${data.totalModels || 0}</div>
         </div>
         <div class="stat-card">
             <h3>Total Requests</h3>
-            <div class="value">${stats?.totalRequests || 0}</div>
+            <div class="value">${data.totalRequests || 0}</div>
         </div>
         <div class="stat-card">
             <h3>Total Revenue</h3>
-            <div class="value">$${(stats?.totalRevenue || 0).toFixed(2)}</div>
+            <div class="value">$${(data.totalRevenue || 0).toFixed(2)}</div>
         </div>
     `;
 
     // Render recent usage table
     const usageTable = document.getElementById('recentUsageTable');
-    if (!recentUsage || recentUsage.length === 0) {
+    const recentUsage = data.recentUsage || [];
+    if (recentUsage.length === 0) {
         usageTable.innerHTML = `
             <tr>
                 <td colspan="5" style="text-align: center; padding: 40px; color: var(--text-secondary);">
@@ -182,10 +183,10 @@ function renderDashboard() {
     } else {
         usageTable.innerHTML = recentUsage.map(row => `
             <tr>
-                <td>${new Date(row.date).toLocaleDateString()}</td>
+                <td>${row.date}</td>
                 <td>${row.requests}</td>
-                <td>${row.inputTokens.toLocaleString()}</td>
-                <td>${row.outputTokens.toLocaleString()}</td>
+                <td>${row.tokens.toLocaleString()}</td>
+                <td>-</td>
                 <td>$${row.cost.toFixed(4)}</td>
             </tr>
         `).join('');
@@ -196,7 +197,7 @@ function renderDashboard() {
 async function loadModels() {
     try {
         const data = await apiRequest('/api/admin/models/list');
-        state.models = data.models || [];
+        state.models = Array.isArray(data) ? data : (data.models || []);
         renderModels();
     } catch (error) {
         showAlert('modelsAlert', 'Failed to load models: ' + error.message, 'error');
@@ -219,11 +220,11 @@ function renderModels() {
 
     table.innerHTML = state.models.map(model => `
         <tr>
-            <td><strong>${model.display_name}</strong></td>
-            <td>${model.actual_model}</td>
-            <td><span class="badge badge-${model.api_format === 'openai' ? 'success' : 'danger'}">${model.api_format}</span></td>
-            <td>$${model.input_price.toFixed(2)}</td>
-            <td>$${model.output_price.toFixed(2)}</td>
+            <td><strong>${model.displayName}</strong></td>
+            <td>${model.actualModel}</td>
+            <td><span class="badge badge-${model.apiFormat === 'openai' ? 'success' : 'danger'}">${model.apiFormat}</span></td>
+            <td>$${model.inputPrice.toFixed(2)}</td>
+            <td>$${model.outputPrice.toFixed(2)}</td>
             <td>
                 <span class="badge badge-${model.enabled ? 'success' : 'danger'}">
                     ${model.enabled ? 'Enabled' : 'Disabled'}
@@ -231,8 +232,8 @@ function renderModels() {
             </td>
             <td>
                 <div class="actions">
-                    <button class="btn btn-sm btn-secondary" onclick="editModel(${model.id})">Edit</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteModel(${model.id}, '${model.display_name}')">Delete</button>
+                    <button class="btn btn-sm btn-secondary" onclick="editModel('${model.id}')">Edit</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteModel('${model.id}', '${model.displayName}')">Delete</button>
                 </div>
             </td>
         </tr>
@@ -247,15 +248,15 @@ function openModelModal(model = null) {
     if (model) {
         title.textContent = 'Edit Model';
         document.getElementById('modelId').value = model.id;
-        document.getElementById('displayName').value = model.display_name;
-        document.getElementById('actualModel').value = model.actual_model;
-        document.getElementById('apiUrl').value = model.api_url;
-        document.getElementById('apiKey').value = model.api_key;
-        document.getElementById('apiFormat').value = model.api_format;
-        document.getElementById('inputPrice').value = model.input_price;
-        document.getElementById('outputPrice').value = model.output_price;
-        document.getElementById('systemPrompt').value = model.system_prompt || '';
-        document.getElementById('disableSystem').checked = model.disable_system || false;
+        document.getElementById('displayName').value = model.displayName;
+        document.getElementById('actualModel').value = model.actualModel;
+        document.getElementById('apiUrl').value = model.apiUrl;
+        document.getElementById('apiKey').value = model.apiKey;
+        document.getElementById('apiFormat').value = model.apiFormat;
+        document.getElementById('inputPrice').value = model.inputPrice;
+        document.getElementById('outputPrice').value = model.outputPrice;
+        document.getElementById('systemPrompt').value = model.systemPrompt || '';
+        document.getElementById('disableSystem').checked = model.disableSystem || false;
         document.getElementById('enabled').checked = model.enabled;
     } else {
         title.textContent = 'Add Model';
@@ -321,7 +322,7 @@ async function saveModel(formData) {
         };
 
         if (id) {
-            payload.id = parseInt(id);
+            payload.id = id;
         }
 
         await apiRequest(endpoint, {
@@ -344,7 +345,7 @@ async function saveModel(formData) {
 async function loadKeys() {
     try {
         const data = await apiRequest('/api/admin/keys/list');
-        state.keys = data.keys || [];
+        state.keys = Array.isArray(data) ? data : (data.keys || []);
         renderKeys();
     } catch (error) {
         showAlert('keysAlert', 'Failed to load API keys: ' + error.message, 'error');
@@ -368,9 +369,9 @@ function renderKeys() {
     table.innerHTML = state.keys.map(key => `
         <tr>
             <td><strong>${key.name}</strong></td>
-            <td><code>${maskKey(key.key)}</code></td>
+            <td><code>${key.key}</code></td>
             <td>$${key.balance.toFixed(2)}</td>
-            <td>$${key.total_spent.toFixed(2)}</td>
+            <td>$${key.totalSpent.toFixed(2)}</td>
             <td>
                 <span class="badge badge-${key.enabled ? 'success' : 'danger'}">
                     ${key.enabled ? 'Active' : 'Disabled'}
@@ -378,9 +379,9 @@ function renderKeys() {
             </td>
             <td>
                 <div class="actions">
-                    <button class="btn btn-sm btn-success" onclick="addBalance(${key.id}, '${key.name}')">Add Balance</button>
-                    <button class="btn btn-sm btn-secondary" onclick="setBalance(${key.id}, '${key.name}')">Set Balance</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteKey(${key.id}, '${key.name}')">Delete</button>
+                    <button class="btn btn-sm btn-success" onclick="addBalance('${key.id}', '${key.name}')">Add Balance</button>
+                    <button class="btn btn-sm btn-secondary" onclick="setBalance('${key.id}', '${key.name}')">Set Balance</button>
+                    <button class="btn btn-sm btn-danger" onclick="deleteKey('${key.id}', '${key.name}')">Delete</button>
                 </div>
             </td>
         </tr>
@@ -507,7 +508,7 @@ async function deleteKey(id, name) {
 async function loadSettings() {
     try {
         const data = await apiRequest('/api/admin/settings/get');
-        state.settings = data.settings || {};
+        state.settings = data;
         renderSettings();
     } catch (error) {
         showAlert('settingsAlert', 'Failed to load settings: ' + error.message, 'error');
@@ -515,8 +516,8 @@ async function loadSettings() {
 }
 
 function renderSettings() {
-    document.getElementById('systemPromptEnabled').checked = state.settings.system_prompt_enabled || false;
-    document.getElementById('globalSystemPrompt').value = state.settings.global_system_prompt || '';
+    document.getElementById('systemPromptEnabled').checked = state.settings.systemPromptEnabled === 'true';
+    document.getElementById('globalSystemPrompt').value = state.settings.globalSystemPrompt || '';
 }
 
 async function saveSettings(formData) {
@@ -530,8 +531,10 @@ async function saveSettings(formData) {
         await apiRequest('/api/admin/settings/save', {
             method: 'POST',
             body: JSON.stringify({
-                systemPromptEnabled: formData.get('systemPromptEnabled') === 'on',
-                globalSystemPrompt: formData.get('globalSystemPrompt') || ''
+                settings: {
+                    systemPromptEnabled: formData.get('systemPromptEnabled') === 'on' ? 'true' : 'false',
+                    globalSystemPrompt: formData.get('globalSystemPrompt') || ''
+                }
             })
         });
 
