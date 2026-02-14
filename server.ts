@@ -12,6 +12,12 @@ const PORT = parseInt(process.env.PORT || '3000', 10);
 
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
+
+// Admin SPA — must be before express.static to avoid redirect loop
+const adminHtml = path.join(__dirname, 'public', 'admin', 'index.html');
+app.get('/admin', (_req, res) => res.sendFile(adminHtml));
+app.get('/admin/', (_req, res) => res.sendFile(adminHtml));
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // Dynamic API route loading
@@ -53,15 +59,9 @@ try {
   logger.warn('Proxy module not loaded yet', { error: (err as Error).message });
 }
 
-// Admin SPA fallback
-app.get('/admin', (_req, res) => {
-  res.redirect('/admin/');
-});
-app.get('/admin/', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
-});
+// Admin SPA fallback for sub-paths
 app.get('/admin/*', (_req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'admin', 'index.html'));
+  res.sendFile(adminHtml);
 });
 
 app.listen(PORT, () => {
