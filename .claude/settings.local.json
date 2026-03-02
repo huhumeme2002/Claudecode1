@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(ls -la D:/claudecodebalance/*.ts D:/claudecodebalance/*.json D:/claudecodebalance/*.md D:/claudecodebalance/*.js)",
+      "mcp__sequential-thinking__sequentialthinking"
+    ]
+  }
+}

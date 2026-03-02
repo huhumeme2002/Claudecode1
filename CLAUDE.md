@@ -29,6 +29,12 @@ npm run dev                    # Dev mode via ts-node (run manually in terminal)
 
 TypeScript compiles to `dist/` (CommonJS, ES2020 target). The build script also copies `public/` into `dist/public/` for static serving.
 
+## Database
+
+Prisma schema is located at `prisma/schema.prisma`. Tables use snake_case (`@@map`), TypeScript uses camelCase. `BigInt` is used for `totalTokens` on ApiKey — convert with `Number()` before JSON serialization.
+
+Four models: `ApiKey`, `ModelMapping`, `UsageLog`, `Setting`.
+
 ## Environment Variables
 
 Required in `.env`:
@@ -94,10 +100,6 @@ Priority: global master switch → per-model disable flag → per-model prompt �
 
 - **OpenAI**: `usage.prompt_tokens` / `usage.completion_tokens` (stream: final chunk; non-stream: response body)
 - **Anthropic**: `message.usage.input_tokens` (message_start event) / `usage.output_tokens` (message_delta event)
-
-### Database Schema (Prisma)
-
-Four models: `ApiKey`, `ModelMapping`, `UsageLog`, `Setting`. Tables use snake_case (`@@map`), TypeScript uses camelCase. `BigInt` is used for `totalTokens` on ApiKey — convert with `Number()` before JSON serialization.
 
 ## Critical Rules
 

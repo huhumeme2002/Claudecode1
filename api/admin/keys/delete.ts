@@ -14,12 +14,14 @@ router.delete('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
-    await prisma.apiKey.delete({
-      where: { id },
-    });
+    await prisma.$transaction([
+      prisma.usageLog.deleteMany({ where: { apiKeyId: id } }),
+      prisma.apiKey.delete({ where: { id } }),
+    ]);
 
     res.json({ success: true });
   } catch (error) {
+    console.error('Failed to delete API key:', error);
     res.status(500).json({ error: 'Failed to delete API key' });
   }
 });
