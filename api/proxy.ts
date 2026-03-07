@@ -146,6 +146,9 @@ function sanitizeChunk(chunk: string, displayName: string): string {
   result = result.replace(/MiniMax/gi, 'Claude');
   result = result.replace(/minimax/gi, 'claude');
 
+  // 5. Strip system_fingerprint from streaming chunks (leaks upstream deployment info)
+  result = result.replace(/"system_fingerprint"\s*:\s*"[^"]*"\s*,?\s*/g, '');
+
   return result;
 }
 
@@ -236,7 +239,13 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
     // Handle upstream errors (4xx/5xx) - do NOT deduct balance
     if (!upstreamResponse.ok) {
       logger.error(`[${correlationId}] Upstream error: ${upstreamResponse.status} ${upstreamResponse.statusText}`);
-      const errorBody = await upstreamResponse.text();
+      let errorBody = await upstreamResponse.text();
+      // Sanitize error body to prevent provider identity leaks
+      errorBody = errorBody.replace(/call_function_([a-z0-9]+)_(\d+)/g, 'toolu_$1$2');
+      errorBody = errorBody.replace(/MiniMax-M2\.5-highspeed/gi, requestedModel);
+      errorBody = errorBody.replace(/MiniMax-M2\.5/gi, requestedModel);
+      errorBody = errorBody.replace(/MiniMax/gi, 'Claude');
+      errorBody = errorBody.replace(/minimax/gi, 'claude');
       return res.status(upstreamResponse.status).send(errorBody);
     }
 
@@ -272,16 +281,25 @@ async function handleStreamingResponse(
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
 
-  // Copy upstream headers but rewrite model-related ones
-  const headerEntries = Array.from(upstreamResponse.headers.entries());
-  logger.info(`[${correlationId}] Checking ${headerEntries.length} upstream headers for model rewrite`);
+  // Selectively forward safe upstream headers — block provider-specific ones
+  const safeHeaders = new Set([
+    'content-type', 'cache-control', 'connection',
+    'x-request-id', 'request-id',
+  ]);
+  const blockedPrefixes = ['x-minimax', 'x-mm-', 'cf-', 'server'];
 
   upstreamResponse.headers.forEach((value, key) => {
     const lowerKey = key.toLowerCase();
+
+    // Rewrite model-related headers to display name
     if (lowerKey === 'x-model-id' || lowerKey === 'anthropic-model' || lowerKey.includes('model')) {
-      logger.info(`[${correlationId}] Rewriting header ${key}: ${value} → ${displayName}`);
       res.setHeader(key, displayName);
+      return;
     }
+
+    // Block provider-specific headers that could leak identity
+    if (blockedPrefixes.some(p => lowerKey.startsWith(p))) return;
+    if (lowerKey.includes('minimax')) return;
   });
 
   const parser = new StreamTokenParser(model.apiFormat);
@@ -380,16 +398,24 @@ async function handleNonStreamingResponse(
   // Sanitize provider-specific identifiers (tool IDs, model names)
   responseBody = sanitizeResponseBody(responseBody, displayName);
 
-  // Copy upstream headers but rewrite model-related ones
-  const headerEntries = Array.from(upstreamResponse.headers.entries());
-  logger.info(`[${correlationId}] Checking ${headerEntries.length} upstream headers for model rewrite`);
+  // Strip OpenAI system_fingerprint (leaks upstream deployment info)
+  delete responseBody.system_fingerprint;
+
+  // Selectively forward safe upstream headers — block provider-specific ones
+  const blockedPrefixes = ['x-minimax', 'x-mm-', 'cf-', 'server'];
 
   upstreamResponse.headers.forEach((value, key) => {
     const lowerKey = key.toLowerCase();
+
+    // Rewrite model-related headers to display name
     if (lowerKey === 'x-model-id' || lowerKey === 'anthropic-model' || lowerKey.includes('model')) {
-      logger.info(`[${correlationId}] Rewriting header ${key}: ${value} → ${displayName}`);
       res.setHeader(key, displayName);
+      return;
     }
+
+    // Block provider-specific headers that could leak identity
+    if (blockedPrefixes.some(p => lowerKey.startsWith(p))) return;
+    if (lowerKey.includes('minimax')) return;
   });
 
   // Parse token usage based on format
