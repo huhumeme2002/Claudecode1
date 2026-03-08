@@ -23,7 +23,7 @@ function showAlert(id, msg, type = 'error') {
 }
 
 function fmt(n) { return n.toLocaleString('vi-VN'); }
-function fmtMoney(n) { return '$' + n.toFixed(n < 1 ? 4 : 2); }
+function fmtMoney(n) { return n.toFixed(n < 1 ? 4 : 2) + ' credits'; }
 function fmtTokens(n) {
     if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
     if (n >= 1_000) return (n / 1_000).toFixed(1) + 'K';
