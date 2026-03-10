@@ -229,11 +229,12 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
 
     logger.info(`[${correlationId}] Proxying request to ${upstreamUrl} (format: ${model.apiFormat}, streaming: ${isStreaming})`);
 
-    // Make upstream request
+    // Make upstream request (600s timeout to handle long LLM generations)
     const upstreamResponse = await fetch(upstreamUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(modifiedBody)
+      body: JSON.stringify(modifiedBody),
+      signal: AbortSignal.timeout(600_000),
     });
 
     // Handle upstream errors (4xx/5xx) - do NOT deduct balance
@@ -319,6 +320,13 @@ async function handleStreamingResponse(
   try {
     let done = false;
     while (!done) {
+      // If client disconnected mid-stream, cancel upstream and free resources
+      if (res.destroyed) {
+        logger.info(`[${correlationId}] Client disconnected, cancelling upstream stream`);
+        await reader.cancel();
+        break;
+      }
+
       const { value, done: streamDone } = await reader.read();
       done = streamDone;
 
