@@ -135,8 +135,8 @@ function sanitizeChunk(chunk: string, displayName: string): string {
   result = result.replace(/^event:\s*minimax:tool_call/gm, 'event: content_block_start');
   result = result.replace(/^event:\s*minimax:[a-z_]+/gm, 'event: content_block_delta');
 
-  // 2. Tool ID format: call_function_xxx_1 → toolu_xxx1 (Anthropic format)
-  result = result.replace(/call_function_([a-z0-9]+)_(\d+)/g, 'toolu_$1$2');
+  // 2. Tool ID format: call_function_xxx_1 → toolu_xxx_1 (Anthropic format, reversible)
+  result = result.replace(/call_function_([a-z0-9]+)_(\d+)/g, 'toolu_$1_$2');
 
   // 3. Specific MiniMax model names
   result = result.replace(/MiniMax-M2\.5-highspeed/gi, displayName);
@@ -156,8 +156,8 @@ function sanitizeChunk(chunk: string, displayName: string): string {
 function sanitizeResponseBody(body: any, displayName: string): any {
   let json = JSON.stringify(body);
 
-  // Tool ID format: call_function_xxx_1 → toolu_xxx1
-  json = json.replace(/call_function_([a-z0-9]+)_(\d+)/g, 'toolu_$1$2');
+  // Tool ID format: call_function_xxx_1 → toolu_xxx_1 (reversible)
+  json = json.replace(/call_function_([a-z0-9]+)_(\d+)/g, 'toolu_$1_$2');
 
   // Specific MiniMax model names
   json = json.replace(/MiniMax-M2\.5-highspeed/gi, displayName);
@@ -222,6 +222,12 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
       modifiedBody.stream_options = { include_usage: true };
     }
 
+    // Reverse-rewrite tool IDs in request body: toolu_xxx_1 → call_function_xxx_1
+    // This restores MiniMax-format tool IDs that were rewritten in previous response turns
+    let bodyStr = JSON.stringify(modifiedBody);
+    bodyStr = bodyStr.replace(/toolu_([a-z0-9]+)_(\d+)/g, 'call_function_$1_$2');
+    const finalBody = JSON.parse(bodyStr);
+
     // Build upstream request
     const headers = buildHeaders(model.apiFormat, model.apiKey);
     const isStreaming = modifiedBody.stream === true;
@@ -233,7 +239,7 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
     const upstreamResponse = await fetch(upstreamUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify(modifiedBody),
+      body: JSON.stringify(finalBody),
       signal: AbortSignal.timeout(600_000),
     });
 
@@ -242,7 +248,7 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
       logger.error(`[${correlationId}] Upstream error: ${upstreamResponse.status} ${upstreamResponse.statusText}`);
       let errorBody = await upstreamResponse.text();
       // Sanitize error body to prevent provider identity leaks
-      errorBody = errorBody.replace(/call_function_([a-z0-9]+)_(\d+)/g, 'toolu_$1$2');
+      errorBody = errorBody.replace(/call_function_([a-z0-9]+)_(\d+)/g, 'toolu_$1_$2');
       errorBody = errorBody.replace(/MiniMax-M2\.5-highspeed/gi, requestedModel);
       errorBody = errorBody.replace(/MiniMax-M2\.5/gi, requestedModel);
       errorBody = errorBody.replace(/MiniMax/gi, 'Claude');
