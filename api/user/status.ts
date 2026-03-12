@@ -37,6 +37,11 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       ? `${k.slice(0, 7)}...${k.slice(-4)}`
       : k;
 
+    // Compute effective spent from budget.remaining to avoid stale DB values
+    const effectiveSpent = isRate
+      ? (req.apiKey.rateLimitAmount! - budget.remaining)
+      : null;
+
     res.json({
       name: req.apiKey.name,
       key_masked: keyMasked,
@@ -44,7 +49,7 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       balance: isRate ? null : req.apiKey.balance,
       rate_limit_amount: req.apiKey.rateLimitAmount,
       rate_limit_interval_hours: req.apiKey.rateLimitIntervalHours,
-      rate_limit_window_spent: req.apiKey.rateLimitWindowSpent,
+      rate_limit_window_spent: effectiveSpent,
       rate_limit_window_remaining: isRate ? budget.remaining : null,
       rate_limit_window_resets_at: isRate ? budget.windowResetAt : null,
       total_spent: usageStats._sum.cost || 0,

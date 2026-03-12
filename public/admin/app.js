@@ -451,6 +451,20 @@ function toggleBillingType() {
     document.getElementById('rateLimitIntervalHours').required = isRate;
 }
 
+function applyPreset(amount, hours, days) {
+    // Switch to Rate Plan
+    document.querySelector('input[name="billingType"][value="rate"]').checked = true;
+    toggleBillingType();
+
+    // Fill rate fields
+    document.getElementById('rateLimitAmount').value = amount;
+    document.getElementById('rateLimitIntervalHours').value = hours;
+
+    // Set duration
+    document.getElementById('durationDays').value = String(days);
+    toggleCustomExpiry();
+}
+
 function toggleCustomExpiry() {
     const val = document.getElementById('durationDays').value;
     document.getElementById('customExpiryField').style.display = val === 'custom' ? 'block' : 'none';

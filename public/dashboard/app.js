@@ -77,10 +77,7 @@ function showApp() {
 }
 
 async function loadAll() {
-    await loadStatus();
-    loadChart();
-    loadSummary();
-    loadRecent();
+    await Promise.all([loadStatus(), loadChart(), loadSummary(), loadRecent()]);
 }
 
 // Status
