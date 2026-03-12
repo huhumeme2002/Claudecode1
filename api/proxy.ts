@@ -244,16 +244,47 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
     });
 
     // Handle upstream errors (4xx/5xx) - do NOT deduct balance
+    // Generate Claude/Anthropic-compatible error instead of forwarding raw upstream error
     if (!upstreamResponse.ok) {
-      logger.error(`[${correlationId}] Upstream error: ${upstreamResponse.status} ${upstreamResponse.statusText}`);
-      let errorBody = await upstreamResponse.text();
-      // Sanitize error body to prevent provider identity leaks
-      errorBody = errorBody.replace(/call_function_([a-z0-9]+)_(\d+)/g, 'toolu_$1_$2');
-      errorBody = errorBody.replace(/MiniMax-M2\.5-highspeed/gi, requestedModel);
-      errorBody = errorBody.replace(/MiniMax-M2\.5/gi, requestedModel);
-      errorBody = errorBody.replace(/MiniMax/gi, 'Claude');
-      errorBody = errorBody.replace(/minimax/gi, 'claude');
-      return res.status(upstreamResponse.status).send(errorBody);
+      const rawError = await upstreamResponse.text();
+      logger.error(`[${correlationId}] Upstream error: ${upstreamResponse.status} ${upstreamResponse.statusText} | Raw: ${rawError.substring(0, 500)}`);
+
+      // Map HTTP status to Anthropic-compatible error type and user-friendly message
+      let errorType: string;
+      let errorMessage: string;
+      const status = upstreamResponse.status;
+
+      if (status === 429) {
+        errorType = 'overloaded_error';
+        errorMessage = `${requestedModel} is currently overloaded. Please try again later.`;
+      } else if (status === 400) {
+        // Try to extract a safe, generic reason from the raw error
+        let safeDetail = '';
+        try {
+          const parsed = JSON.parse(rawError);
+          const msg = parsed?.error?.message || parsed?.detail || '';
+          // Only keep if it doesn't leak provider info
+          if (msg && !/minimax|MiniMax/i.test(msg)) {
+            safeDetail = `: ${msg}`;
+          }
+        } catch { /* ignore parse errors */ }
+        errorType = 'invalid_request_error';
+        errorMessage = `Invalid request${safeDetail}`;
+      } else if (status === 401 || status === 403) {
+        errorType = 'authentication_error';
+        errorMessage = 'An authentication error occurred. Please contact the administrator.';
+      } else {
+        errorType = 'api_error';
+        errorMessage = 'An unexpected error occurred. Please try again later.';
+      }
+
+      return res.status(status).json({
+        type: 'error',
+        error: {
+          type: errorType,
+          message: errorMessage,
+        },
+      });
     }
 
     // Debug: log all upstream response headers
