@@ -428,11 +428,18 @@ function maskKey(key) {
     return key.substring(0, 8) + '...' + key.substring(key.length - 4);
 }
 
+function randomKeyName() {
+    const hex = Math.random().toString(16).slice(2, 6).toUpperCase();
+    return 'Key-' + hex;
+}
+
 function openCreateKeyModal() {
     document.getElementById('createKeyModal').classList.add('active');
     // Reset to flat billing type
     document.querySelector('input[name="billingType"][value="flat"]').checked = true;
     toggleBillingType();
+    // Auto-fill random name
+    document.getElementById('keyName').value = randomKeyName();
 }
 
 function closeCreateKeyModal() {
@@ -452,6 +459,11 @@ function toggleBillingType() {
 }
 
 function applyPreset(amount, hours, days) {
+    // Auto-fill name if empty
+    if (!document.getElementById('keyName').value.trim()) {
+        document.getElementById('keyName').value = randomKeyName();
+    }
+
     // Switch to Rate Plan
     document.querySelector('input[name="billingType"][value="rate"]').checked = true;
     toggleBillingType();
