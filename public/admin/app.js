@@ -401,10 +401,21 @@ function renderKeys() {
     let filteredKeys = state.keys;
 
     if (searchQuery) {
-        filteredKeys = state.keys.filter(key =>
-            key.name.toLowerCase().includes(searchQuery) ||
-            key.key.toLowerCase().includes(searchQuery)
-        );
+        filteredKeys = state.keys.filter(key => {
+            // Match by name
+            if (key.name.toLowerCase().includes(searchQuery)) return true;
+            // Match by masked key directly
+            if (key.key.toLowerCase().includes(searchQuery)) return true;
+            // Smart match: if user pastes full key, extract prefix+suffix to match masked key
+            // Masked format: "sk-1dab...affe" (first 7 chars + ... + last 4 chars)
+            if (searchQuery.length > 11) {
+                const prefix = searchQuery.slice(0, 7);
+                const suffix = searchQuery.slice(-4);
+                const maskedKey = key.key.toLowerCase();
+                if (maskedKey.startsWith(prefix) && maskedKey.endsWith(suffix)) return true;
+            }
+            return false;
+        });
     }
 
     const table = document.getElementById('keysTable');
