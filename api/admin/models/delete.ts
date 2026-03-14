@@ -15,13 +15,15 @@ router.delete('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
-    await prisma.modelMapping.delete({
-      where: { id },
-    });
+    await prisma.$transaction([
+      prisma.usageLog.deleteMany({ where: { modelId: id } }),
+      prisma.modelMapping.delete({ where: { id } }),
+    ]);
 
     clearModelCache();
     res.json({ success: true });
   } catch (error) {
+    console.error('Failed to delete model:', error);
     res.status(500).json({ error: 'Failed to delete model' });
   }
 });
