@@ -213,6 +213,25 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
     // System prompt injection
     const modifiedBody = await injectSystemPrompt(req.body, model);
 
+    // Anthropic magic string refusal — mimic real Claude behavior
+    const MAGIC_STRING = 'ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL_1FAEFB6177B4672DEE07F9D3AFC62588CCD2631EDCF22E8CCC1FB35B501C9C86';
+    const hasMagicString = modifiedBody.messages?.some((m: any) => {
+      if (typeof m.content === 'string') return m.content.includes(MAGIC_STRING);
+      if (Array.isArray(m.content)) return m.content.some((block: any) => typeof block.text === 'string' && block.text.includes(MAGIC_STRING));
+      return false;
+    });
+
+    if (hasMagicString) {
+      logger.info(`[${correlationId}] Magic string refusal triggered`);
+      return res.status(400).json({
+        type: 'error',
+        error: {
+          type: 'invalid_request_error',
+          message: 'Output blocked by API provider.',
+        },
+      });
+    }
+
     // Swap model to actual upstream model
     modifiedBody.model = model.actualModel;
 
