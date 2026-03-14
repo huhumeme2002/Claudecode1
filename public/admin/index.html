@@ -496,21 +496,183 @@
             color: var(--text-primary);
         }
 
+        /* Search bar */
+        .search-bar {
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .search-bar input {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .search-bar input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        /* Hamburger menu */
+        .hamburger {
+            display: none;
+            position: fixed;
+            top: 12px;
+            left: 12px;
+            z-index: 1001;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            width: 40px;
+            height: 40px;
+            font-size: 22px;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.4);
+            z-index: 999;
+        }
+
+        .sidebar-overlay.active {
+            display: block;
+        }
+
+        /* Mobile card layout for keys */
+        .key-cards {
+            display: none;
+        }
+
+        .key-card {
+            padding: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .key-card:last-child {
+            border-bottom: none;
+        }
+
+        .key-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .key-card-header strong {
+            font-size: 15px;
+        }
+
+        .key-card-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 13px;
+            margin-bottom: 12px;
+        }
+
+        .key-card-details .label {
+            color: var(--text-secondary);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .key-card-details .value {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .key-card-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
         /* Responsive */
         @media (max-width: 768px) {
+            .hamburger {
+                display: flex;
+            }
+
             .sidebar {
-                width: 100%;
-                position: relative;
-                height: auto;
+                position: fixed;
+                left: -260px;
+                width: 250px;
+                z-index: 1000;
+                transition: left 0.3s ease;
+            }
+
+            .sidebar.open {
+                left: 0;
             }
 
             .main-content {
                 margin-left: 0;
                 width: 100%;
+                padding: 15px;
+                padding-top: 60px;
+            }
+
+            .content-header h1 {
+                font-size: 22px;
             }
 
             .stats-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+
+            .stat-card {
+                padding: 14px;
+            }
+
+            .stat-card .value {
+                font-size: 20px;
+            }
+
+            /* Hide desktop table, show cards on mobile */
+            .desktop-table {
+                display: none;
+            }
+
+            .key-cards {
+                display: block;
+            }
+
+            .table-header {
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .table-header h2 {
+                font-size: 16px;
+            }
+
+            .modal-content {
+                max-width: 95vw;
+                max-height: 95vh;
+            }
+
+            .modal-body {
+                padding: 15px;
+            }
+
+            .actions {
+                flex-wrap: wrap;
             }
 
             .table-container {
@@ -528,6 +690,10 @@
     </style>
 </head>
 <body>
+    <!-- Hamburger menu button -->
+    <button class="hamburger" id="hamburgerBtn" onclick="toggleSidebar()">☰</button>
+    <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
     <!-- Login Page -->
     <div id="loginPage" class="login-container">
         <div class="login-box">
@@ -639,7 +805,11 @@
                         <h2>API Key List</h2>
                         <button class="btn btn-primary" id="createKeyBtn">Create Key</button>
                     </div>
-                    <table>
+                    <div class="search-bar">
+                        <input type="text" id="keySearchInput" placeholder="Tìm kiếm theo tên hoặc key..." oninput="filterKeys()">
+                    </div>
+                    <!-- Desktop table -->
+                    <table class="desktop-table">
                         <thead>
                             <tr>
                                 <th>Name</th>
@@ -656,6 +826,10 @@
                             <!-- Key rows will be inserted here -->
                         </tbody>
                     </table>
+                    <!-- Mobile cards -->
+                    <div id="keysCards" class="key-cards">
+                        <!-- Key cards will be inserted here -->
+                    </div>
                 </div>
             </div>
 
@@ -923,6 +1097,6 @@
         </div>
     </div>
 
-    <script src="app.js?v=6"></script>
+    <script src="app.js?v=7"></script>
 </body>
 </html>

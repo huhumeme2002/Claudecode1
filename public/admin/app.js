@@ -352,76 +352,127 @@ async function loadKeys() {
     }
 }
 
-function renderKeys() {
-    const table = document.getElementById('keysTable');
+function getKeyDisplayData(key) {
+    const isRate = key.rateLimitAmount != null && key.rateLimitIntervalHours != null;
+    let planLabel, balanceLabel;
 
-    if (state.keys.length === 0) {
+    if (isRate) {
+        const spent = key.rateLimitWindowSpent || 0;
+        planLabel = `<span class="badge badge-success">Rate</span>`;
+        balanceLabel = `$${key.rateLimitAmount.toFixed(2)}/${key.rateLimitIntervalHours}h ($${spent.toFixed(2)} spent)`;
+    } else {
+        planLabel = `<span class="badge badge-success">Flat</span>`;
+        balanceLabel = `$${key.balance.toFixed(2)}`;
+    }
+
+    let expiryLabel;
+    if (!key.expiry) {
+        expiryLabel = `<span style="color: var(--text-secondary);">Không giới hạn</span>`;
+    } else {
+        const now = new Date();
+        const exp = new Date(key.expiry);
+        const diffMs = exp.getTime() - now.getTime();
+        const diffDays = Math.ceil(diffMs / 86400000);
+        if (diffMs <= 0) {
+            const agoD = Math.abs(diffDays);
+            expiryLabel = `<span style="color: var(--danger);">Hết hạn ${agoD} ngày trước</span>`;
+        } else if (diffDays <= 3) {
+            expiryLabel = `<span style="color: var(--warning);">Còn ${diffDays} ngày</span>`;
+        } else {
+            expiryLabel = `<span style="color: var(--success);">Còn ${diffDays} ngày</span>`;
+        }
+    }
+
+    const statusBadge = `<span class="badge badge-${key.enabled ? 'success' : 'danger'}">${key.enabled ? 'Active' : 'Disabled'}</span>`;
+
+    const actions = `
+        <button class="btn btn-sm btn-secondary" onclick="editKey('${key.id}')">Edit</button>
+        ${!isRate ? `<button class="btn btn-sm btn-success" onclick="addBalance('${key.id}', '${key.name}')">Add Balance</button>
+        <button class="btn btn-sm btn-secondary" onclick="setBalance('${key.id}', '${key.name}')">Set Balance</button>` : ''}
+        <button class="btn btn-sm btn-primary" onclick="extendKey('${key.id}', '${key.name}')">Gia hạn</button>
+        <button class="btn btn-sm btn-danger" onclick="deleteKey('${key.id}', '${key.name}')">Delete</button>
+    `;
+
+    return { isRate, planLabel, balanceLabel, expiryLabel, statusBadge, actions };
+}
+
+function renderKeys() {
+    const searchQuery = (document.getElementById('keySearchInput')?.value || '').toLowerCase();
+    let filteredKeys = state.keys;
+
+    if (searchQuery) {
+        filteredKeys = state.keys.filter(key =>
+            key.name.toLowerCase().includes(searchQuery) ||
+            key.key.toLowerCase().includes(searchQuery)
+        );
+    }
+
+    const table = document.getElementById('keysTable');
+    const cards = document.getElementById('keysCards');
+
+    if (filteredKeys.length === 0) {
+        const emptyMsg = searchQuery
+            ? 'Không tìm thấy key nào phù hợp.'
+            : 'No API keys created. Click "Create Key" to get started.';
         table.innerHTML = `
             <tr>
                 <td colspan="8" style="text-align: center; padding: 40px; color: var(--text-secondary);">
-                    No API keys created. Click "Create Key" to get started.
+                    ${emptyMsg}
                 </td>
             </tr>
         `;
+        if (cards) cards.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-secondary);">${emptyMsg}</div>`;
         return;
     }
 
-    table.innerHTML = state.keys.map(key => {
-        const isRate = key.rateLimitAmount != null && key.rateLimitIntervalHours != null;
-        let planLabel, balanceLabel;
-
-        if (isRate) {
-            const spent = key.rateLimitWindowSpent || 0;
-            planLabel = `<span class="badge badge-success">Rate</span>`;
-            balanceLabel = `$${key.rateLimitAmount.toFixed(2)}/${key.rateLimitIntervalHours}h ($${spent.toFixed(2)} spent)`;
-        } else {
-            planLabel = `<span class="badge badge-success">Flat</span>`;
-            balanceLabel = `$${key.balance.toFixed(2)}`;
-        }
-
-        // Expiry display
-        let expiryLabel;
-        if (!key.expiry) {
-            expiryLabel = `<span style="color: var(--text-secondary);">Không giới hạn</span>`;
-        } else {
-            const now = new Date();
-            const exp = new Date(key.expiry);
-            const diffMs = exp.getTime() - now.getTime();
-            const diffDays = Math.ceil(diffMs / 86400000);
-            if (diffMs <= 0) {
-                const agoD = Math.abs(diffDays);
-                expiryLabel = `<span style="color: var(--danger);">Hết hạn ${agoD} ngày trước</span>`;
-            } else if (diffDays <= 3) {
-                expiryLabel = `<span style="color: var(--warning);">Còn ${diffDays} ngày</span>`;
-            } else {
-                expiryLabel = `<span style="color: var(--success);">Còn ${diffDays} ngày</span>`;
-            }
-        }
-
+    // Desktop table
+    table.innerHTML = filteredKeys.map(key => {
+        const d = getKeyDisplayData(key);
         return `
         <tr>
             <td><strong>${key.name}</strong></td>
             <td><code>${key.key}</code></td>
-            <td>${planLabel}</td>
-            <td>${balanceLabel}</td>
-            <td>${expiryLabel}</td>
+            <td>${d.planLabel}</td>
+            <td>${d.balanceLabel}</td>
+            <td>${d.expiryLabel}</td>
             <td>$${key.totalSpent.toFixed(2)}</td>
-            <td>
-                <span class="badge badge-${key.enabled ? 'success' : 'danger'}">
-                    ${key.enabled ? 'Active' : 'Disabled'}
-                </span>
-            </td>
-            <td>
-                <div class="actions">
-                    <button class="btn btn-sm btn-secondary" onclick="editKey('${key.id}')">Edit</button>
-                    ${!isRate ? `<button class="btn btn-sm btn-success" onclick="addBalance('${key.id}', '${key.name}')">Add Balance</button>
-                    <button class="btn btn-sm btn-secondary" onclick="setBalance('${key.id}', '${key.name}')">Set Balance</button>` : ''}
-                    <button class="btn btn-sm btn-primary" onclick="extendKey('${key.id}', '${key.name}')">Gia hạn</button>
-                    <button class="btn btn-sm btn-danger" onclick="deleteKey('${key.id}', '${key.name}')">Delete</button>
-                </div>
-            </td>
+            <td>${d.statusBadge}</td>
+            <td><div class="actions">${d.actions}</div></td>
         </tr>
     `}).join('');
+
+    // Mobile cards
+    if (cards) {
+        cards.innerHTML = filteredKeys.map(key => {
+            const d = getKeyDisplayData(key);
+            return `
+            <div class="key-card">
+                <div class="key-card-header">
+                    <strong>${key.name}</strong>
+                    ${d.statusBadge}
+                </div>
+                <div class="key-card-details">
+                    <div><div class="label">Key</div><div class="value"><code style="font-size:11px;word-break:break-all;">${key.key}</code></div></div>
+                    <div><div class="label">Plan</div><div class="value">${d.planLabel}</div></div>
+                    <div><div class="label">Balance</div><div class="value">${d.balanceLabel}</div></div>
+                    <div><div class="label">Expiry</div><div class="value">${d.expiryLabel}</div></div>
+                    <div><div class="label">Total Spent</div><div class="value">$${key.totalSpent.toFixed(2)}</div></div>
+                </div>
+                <div class="key-card-actions">${d.actions}</div>
+            </div>
+        `}).join('');
+    }
+}
+
+function filterKeys() {
+    renderKeys();
+}
+
+function toggleSidebar() {
+    const sidebar = document.querySelector('.sidebar');
+    const overlay = document.getElementById('sidebarOverlay');
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('active');
 }
 
 function maskKey(key) {
@@ -771,6 +822,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             switchTab(btn.dataset.tab);
+            // Close sidebar on mobile after tab click
+            document.querySelector('.sidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('active');
         });
     });
 
