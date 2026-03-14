@@ -193,8 +193,11 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
     if (!budget.allowed) {
       if (budget.type === 'rate') {
         return res.status(429).json({
-          error: 'Rate budget exhausted',
-          message: `Budget limit reached. Resets at ${budget.windowResetAt!.toISOString()}`,
+          type: 'error',
+          error: {
+            type: 'overloaded_error',
+            message: `${req.body.model || 'Model'} is temporarily unavailable due to high demand. Please try again later.`,
+          },
         });
       }
       return res.status(402).json({ error: 'Insufficient balance' });
@@ -300,7 +303,13 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
 
   } catch (error: any) {
     logger.error(`[${correlationId}] Proxy error:`, error);
-    return res.status(500).json({ error: 'Internal proxy error', message: error.message });
+    return res.status(500).json({
+      type: 'error',
+      error: {
+        type: 'api_error',
+        message: 'An unexpected error occurred. Please try again later.',
+      },
+    });
   }
 }
 
