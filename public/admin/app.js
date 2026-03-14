@@ -413,6 +413,7 @@ function renderKeys() {
             </td>
             <td>
                 <div class="actions">
+                    <button class="btn btn-sm btn-secondary" onclick="editKey('${key.id}')">Edit</button>
                     ${!isRate ? `<button class="btn btn-sm btn-success" onclick="addBalance('${key.id}', '${key.name}')">Add Balance</button>
                     <button class="btn btn-sm btn-secondary" onclick="setBalance('${key.id}', '${key.name}')">Set Balance</button>` : ''}
                     <button class="btn btn-sm btn-primary" onclick="extendKey('${key.id}', '${key.name}')">Gia hạn</button>
@@ -624,6 +625,84 @@ async function deleteKey(id, name) {
     }
 }
 
+// Edit Key functions
+function editKey(id) {
+    const key = state.keys.find(k => k.id === id);
+    if (key) {
+        openEditKeyModal(key);
+    }
+}
+
+function openEditKeyModal(key) {
+    const modal = document.getElementById('editKeyModal');
+    document.getElementById('editKeyId').value = key.id;
+    document.getElementById('editKeyName').value = key.name;
+    document.getElementById('editKeyEnabled').checked = key.enabled;
+
+    const isRate = key.rateLimitAmount != null && key.rateLimitIntervalHours != null;
+    const editRateFields = document.getElementById('editRateFields');
+    const editFlatFields = document.getElementById('editFlatFields');
+
+    if (isRate) {
+        editRateFields.style.display = 'block';
+        editFlatFields.style.display = 'none';
+        document.getElementById('editRateLimitAmount').value = key.rateLimitAmount;
+        document.getElementById('editRateLimitIntervalHours').value = key.rateLimitIntervalHours;
+    } else {
+        editRateFields.style.display = 'none';
+        editFlatFields.style.display = 'block';
+        document.getElementById('editBalance').value = key.balance;
+    }
+
+    modal.classList.add('active');
+}
+
+function closeEditKeyModal() {
+    document.getElementById('editKeyModal').classList.remove('active');
+    document.getElementById('editKeyForm').reset();
+}
+
+async function saveKeyEdit(formData) {
+    const editKeyBtn = document.getElementById('editKeyBtnText');
+    const editKeyLoading = document.getElementById('editKeyBtnLoading');
+
+    try {
+        editKeyBtn.classList.add('hidden');
+        editKeyLoading.classList.remove('hidden');
+
+        const id = formData.get('id');
+        const key = state.keys.find(k => k.id === id);
+        const isRate = key && key.rateLimitAmount != null && key.rateLimitIntervalHours != null;
+
+        const payload = {
+            id,
+            name: formData.get('name'),
+            enabled: formData.get('enabled') === 'on',
+        };
+
+        if (isRate) {
+            payload.rateLimitAmount = parseFloat(formData.get('rateLimitAmount'));
+            payload.rateLimitIntervalHours = parseFloat(formData.get('rateLimitIntervalHours'));
+        } else {
+            payload.balance = parseFloat(formData.get('balance'));
+        }
+
+        await apiRequest('/api/admin/keys/update', {
+            method: 'PUT',
+            body: JSON.stringify(payload)
+        });
+
+        showAlert('keysAlert', 'API key updated successfully', 'success');
+        closeEditKeyModal();
+        loadKeys();
+    } catch (error) {
+        showAlert('keysAlert', 'Failed to update key: ' + error.message, 'error');
+    } finally {
+        editKeyBtn.classList.remove('hidden');
+        editKeyLoading.classList.add('hidden');
+    }
+}
+
 // Settings functions
 async function loadSettings() {
     try {
@@ -713,6 +792,12 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const formData = new FormData(e.target);
         createKey(formData);
+    });
+
+    document.getElementById('editKeyForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        saveKeyEdit(formData);
     });
 
     // Settings

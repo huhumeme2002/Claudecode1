@@ -873,6 +873,56 @@
         </div>
     </div>
 
-    <script src="app.js?v=5"></script>
+    <!-- Edit Key Modal -->
+    <div id="editKeyModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Edit API Key</h2>
+                <button class="modal-close" onclick="closeEditKeyModal()">&times;</button>
+            </div>
+            <form id="editKeyForm">
+                <div class="modal-body">
+                    <input type="hidden" id="editKeyId" name="id">
+                    <div class="form-group">
+                        <label for="editKeyName">Key Name</label>
+                        <input type="text" id="editKeyName" name="name" required>
+                    </div>
+                    <div id="editRateFields">
+                        <div class="form-group">
+                            <label for="editRateLimitAmount">Budget per Window ($)</label>
+                            <input type="number" id="editRateLimitAmount" name="rateLimitAmount" step="0.01" min="0.01">
+                            <small>Dollar amount available per time window</small>
+                        </div>
+                        <div class="form-group">
+                            <label for="editRateLimitIntervalHours">Window Interval (hours)</label>
+                            <input type="number" id="editRateLimitIntervalHours" name="rateLimitIntervalHours" step="0.1" min="0.1">
+                            <small>Budget resets after this many hours</small>
+                        </div>
+                    </div>
+                    <div id="editFlatFields" style="display: none;">
+                        <div class="form-group">
+                            <label for="editBalance">Balance ($)</label>
+                            <input type="number" id="editBalance" name="balance" step="0.01" min="0">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <div class="checkbox-group">
+                            <input type="checkbox" id="editKeyEnabled" name="enabled" checked>
+                            <label for="editKeyEnabled">Enable this key</label>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditKeyModal()">Cancel</button>
+                    <button type="submit" class="btn btn-success">
+                        <span id="editKeyBtnText">Save</span>
+                        <span id="editKeyBtnLoading" class="loading hidden"></span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script src="app.js?v=6"></script>
 </body>
 </html>
