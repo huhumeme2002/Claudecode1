@@ -33,10 +33,10 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
   const xApiKey = req.headers['x-api-key'] as string | undefined;
 
   let key: string | undefined;
-  if (authHeader && authHeader.startsWith('Bearer ')) {
-    key = authHeader.slice(7);
-  } else if (xApiKey) {
+  if (xApiKey) {
     key = xApiKey;
+  } else if (authHeader && authHeader.startsWith('Bearer ')) {
+    key = authHeader.slice(7);
   }
 
   if (!key) {
