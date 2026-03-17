@@ -5,8 +5,18 @@ import prisma from '../../../lib/db';
 
 const router = Router();
 
+// Cache key list for 5 seconds — admin doesn't need real-time data on F5
+let keysCache: { data: any; timestamp: number } | null = null;
+const CACHE_TTL_MS = 5_000;
+
 router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
+    const now = Date.now();
+    if (keysCache && (now - keysCache.timestamp) < CACHE_TTL_MS) {
+      res.json(keysCache.data);
+      return;
+    }
+
     const keys = await prisma.apiKey.findMany({
       orderBy: { createdAt: 'desc' },
     });
@@ -25,6 +35,7 @@ router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =>
       rateLimitWindowSpent: key.rateLimitWindowSpent,
     }));
 
+    keysCache = { data: result, timestamp: now };
     res.json(result);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch API keys' });

@@ -2,14 +2,28 @@ import { Router, Response } from 'express';
 import { verifyApiKey } from '../../lib/auth';
 import { getEffectiveBudget } from '../../lib/billing';
 import { AuthenticatedRequest } from '../../lib/types';
+import { LRUCache } from 'lru-cache';
 import prisma from '../../lib/db';
 
 const router = Router();
+
+// Cache user status for 10 seconds to reduce DB pressure during rapid F5
+const statusCache = new LRUCache<string, { data: any; timestamp: number }>({
+  max: 1000,
+  ttl: 10_000,
+});
 
 router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) => {
   try {
     if (!req.apiKey) {
       res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const cacheKey = req.apiKey.id;
+    const cached = statusCache.get(cacheKey);
+    if (cached) {
+      res.json(cached.data);
       return;
     }
 
@@ -42,7 +56,7 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       ? (req.apiKey.rateLimitAmount! - budget.remaining)
       : null;
 
-    res.json({
+    const data = {
       name: req.apiKey.name,
       key_masked: keyMasked,
       plan_type: budget.type,
@@ -58,7 +72,10 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       expiry: req.apiKey.expiry,
       days_remaining: daysRemaining,
       expired,
-    });
+    };
+
+    statusCache.set(cacheKey, { data, timestamp: Date.now() });
+    res.json(data);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch status' });
   }
