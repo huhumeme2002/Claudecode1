@@ -28,13 +28,21 @@ export function verifyAdmin(req: AuthenticatedRequest, res: Response, next: Next
 }
 
 export async function verifyApiKey(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
+  // Support both OpenAI-style (Authorization: Bearer) and Anthropic-style (x-api-key)
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+  const xApiKey = req.headers['x-api-key'] as string | undefined;
+
+  let key: string | undefined;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    key = authHeader.slice(7);
+  } else if (xApiKey) {
+    key = xApiKey;
+  }
+
+  if (!key) {
     res.status(401).json({ error: 'Missing or invalid authorization header' });
     return;
   }
-
-  const key = authHeader.slice(7);
   try {
     const apiKey = await prisma.apiKey.findUnique({ where: { key } });
     if (!apiKey || !apiKey.enabled) {
