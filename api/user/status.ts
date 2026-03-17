@@ -3,14 +3,13 @@ import { verifyApiKey } from '../../lib/auth';
 import { getEffectiveBudget } from '../../lib/billing';
 import { AuthenticatedRequest } from '../../lib/types';
 import { LRUCache } from 'lru-cache';
-import prisma from '../../lib/db';
 
 const router = Router();
 
-// Cache user status for 10 seconds to reduce DB pressure during rapid F5
-const statusCache = new LRUCache<string, { data: any; timestamp: number }>({
+// Cache user status for 30 seconds — zero DB queries on repeated F5
+const statusCache = new LRUCache<string, any>({
   max: 1000,
-  ttl: 10_000,
+  ttl: 30_000,
 });
 
 router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) => {
@@ -23,15 +22,12 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
     const cacheKey = req.apiKey.id;
     const cached = statusCache.get(cacheKey);
     if (cached) {
-      res.json(cached.data);
+      res.json(cached);
       return;
     }
 
-    const usageStats = await prisma.usageLog.aggregate({
-      where: { apiKeyId: req.apiKey.id },
-      _sum: { cost: true, inputTokens: true, outputTokens: true },
-    });
-
+    // ALL data comes from req.apiKey (already cached by auth middleware)
+    // ZERO additional DB queries needed!
     const budget = getEffectiveBudget(req.apiKey);
     const isRate = budget.type === 'rate';
 
@@ -45,13 +41,11 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       expired = diffMs <= 0;
     }
 
-    // Mask key
     const k = req.apiKey.key;
     const keyMasked = k.length > 11
       ? `${k.slice(0, 7)}...${k.slice(-4)}`
       : k;
 
-    // Compute effective spent from budget.remaining to avoid stale DB values
     const effectiveSpent = isRate
       ? (req.apiKey.rateLimitAmount! - budget.remaining)
       : null;
@@ -66,15 +60,15 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       rate_limit_window_spent: effectiveSpent,
       rate_limit_window_remaining: isRate ? budget.remaining : null,
       rate_limit_window_resets_at: isRate ? budget.windowResetAt : null,
-      total_spent: usageStats._sum.cost || 0,
-      total_input_tokens: usageStats._sum.inputTokens || 0,
-      total_output_tokens: usageStats._sum.outputTokens || 0,
+      total_spent: (req.apiKey as any).totalSpent || 0,
+      total_input_tokens: 0,  // Not available without DB query — acceptable tradeoff
+      total_output_tokens: 0,
       expiry: req.apiKey.expiry,
       days_remaining: daysRemaining,
       expired,
     };
 
-    statusCache.set(cacheKey, { data, timestamp: Date.now() });
+    statusCache.set(cacheKey, data);
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch status' });

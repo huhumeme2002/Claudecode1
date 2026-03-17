@@ -20,6 +20,8 @@ interface CachedApiKey {
   rateLimitIntervalHours: number | null;
   rateLimitWindowStart: Date | null;
   rateLimitWindowSpent: number | null;
+  totalSpent: number;
+  totalTokens: number;
 }
 
 const NOT_FOUND = Symbol('NOT_FOUND');
@@ -107,6 +109,8 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
       rateLimitIntervalHours: apiKey.rateLimitIntervalHours,
       rateLimitWindowStart: apiKey.rateLimitWindowStart,
       rateLimitWindowSpent: apiKey.rateLimitWindowSpent,
+      totalSpent: apiKey.totalSpent,
+      totalTokens: Number(apiKey.totalTokens),
     };
     apiKeyCache.set(key, entry);
 

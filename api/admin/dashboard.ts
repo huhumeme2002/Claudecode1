@@ -5,9 +5,9 @@ import prisma from '../../lib/db';
 
 const router = Router();
 
-// In-memory cache for dashboard stats — avoid hitting DB on every F5
+// Cache dashboard stats for 2 minutes — admin doesn't need real-time
 let dashboardCache: { data: any; timestamp: number } | null = null;
-const CACHE_TTL_MS = 15_000; // 15 seconds
+const CACHE_TTL_MS = 120_000; // 2 minutes
 
 router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -17,18 +17,21 @@ router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =>
       return;
     }
 
-    // Run independent queries in parallel
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const [totalKeys, activeKeys, totalModels, usageStats, recentUsage] = await Promise.all([
-      prisma.apiKey.count(),
-      prisma.apiKey.count({ where: { enabled: true } }),
-      prisma.modelMapping.count(),
+    // Use api_keys table (small, fast) for revenue instead of scanning usage_logs
+    // api_keys.total_spent is already maintained by billing - no need to SUM usage_logs
+    const [keyStats, totalModels, recentUsage] = await Promise.all([
       prisma.$queryRaw<any[]>`
-        SELECT COUNT(*)::int as total_requests, COALESCE(SUM(cost), 0)::float as total_revenue
-        FROM usage_logs
+        SELECT
+          COUNT(*)::int as total_keys,
+          COUNT(*) FILTER (WHERE enabled = true)::int as active_keys,
+          COALESCE(SUM(total_spent), 0)::float as total_revenue,
+          COALESCE(SUM(total_tokens), 0)::bigint as total_tokens_all
+        FROM api_keys
       `,
+      prisma.modelMapping.count(),
       prisma.$queryRaw<any[]>`
         SELECT
           DATE(created_at) as date,
@@ -43,8 +46,10 @@ router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =>
       `,
     ]);
 
-    const totalRequests = usageStats[0]?.total_requests || 0;
-    const totalRevenue = usageStats[0]?.total_revenue || 0;
+    const ks = keyStats[0];
+
+    // Approximate total requests from recent usage (avoid full table COUNT)
+    const totalRequests = recentUsage.reduce((sum: number, r: any) => sum + Number(r.requests), 0);
 
     const formattedUsage = recentUsage.map((r: any) => ({
       date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
@@ -55,17 +60,22 @@ router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =>
     }));
 
     const data = {
-      totalKeys,
-      activeKeys,
+      totalKeys: ks?.total_keys || 0,
+      activeKeys: ks?.active_keys || 0,
       totalModels,
       totalRequests,
-      totalRevenue,
+      totalRevenue: ks?.total_revenue || 0,
       recentUsage: formattedUsage,
     };
 
     dashboardCache = { data, timestamp: now };
     res.json(data);
   } catch (error) {
+    // If DB is overloaded, return stale cache if available
+    if (dashboardCache) {
+      res.json(dashboardCache.data);
+      return;
+    }
     res.status(500).json({ error: 'Failed to fetch dashboard stats' });
   }
 });
