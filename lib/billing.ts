@@ -59,6 +59,7 @@ export function getEffectiveBudget(key: RateLimitKey): BudgetResult {
 }
 
 export async function deductAndLog(entry: UsageLogEntry & { type?: 'flat' | 'rate' }): Promise<void> {
+  try {
   await prisma.$transaction(async (tx) => {
     const apiKey = await tx.apiKey.findUniqueOrThrow({
       where: { id: entry.apiKeyId },
@@ -138,4 +139,12 @@ export async function deductAndLog(entry: UsageLogEntry & { type?: 'flat' | 'rat
       });
     }
   });
+  } catch (err) {
+    logger.error('Billing deduction failed (will retry not implemented — usage may be missed)', {
+      apiKeyId: entry.apiKeyId,
+      modelId: entry.modelId,
+      cost: entry.cost,
+      error: err,
+    });
+  }
 }
