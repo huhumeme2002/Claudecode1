@@ -2,19 +2,23 @@ import { Router, Response } from 'express';
 import { verifyApiKey } from '../../../lib/auth';
 import { AuthenticatedRequest } from '../../../lib/types';
 import prisma from '../../../lib/db';
+import { LRUCache } from 'lru-cache';
 
 const router = Router();
 
+const chartCache = new LRUCache<string, any>({ max: 500, ttl: 60_000 });
+
 router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    if (!req.apiKey) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
+    if (!req.apiKey) { res.status(401).json({ error: 'Unauthorized' }); return; }
 
     const days = parseInt(req.query.days as string) || 7;
-    const since = new Date(Date.now() - days * 86400_000);
+    const cacheKey = `${req.apiKey.id}:${days}`;
 
+    const cached = chartCache.get(cacheKey);
+    if (cached) { res.json(cached); return; }
+
+    const since = new Date(Date.now() - days * 86400_000);
     const rows: any[] = await prisma.$queryRaw`
       SELECT
         DATE(created_at) as date,
@@ -29,15 +33,18 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       ORDER BY date ASC
     `;
 
-    const chart = rows.map(r => ({
-      date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
-      cost: Number(r.cost),
-      input_tokens: Number(r.input_tokens),
-      output_tokens: Number(r.output_tokens),
-      requests: Number(r.requests),
-    }));
+    const data = {
+      chart: rows.map(r => ({
+        date: r.date instanceof Date ? r.date.toISOString().slice(0, 10) : String(r.date),
+        cost: Number(r.cost),
+        input_tokens: Number(r.input_tokens),
+        output_tokens: Number(r.output_tokens),
+        requests: Number(r.requests),
+      })),
+    };
 
-    res.json({ chart });
+    chartCache.set(cacheKey, data);
+    res.json(data);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch chart data' });
   }
