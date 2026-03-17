@@ -412,7 +412,7 @@ async function handleStreamingResponse(
     if (usage.inputTokens > 0 || usage.outputTokens > 0) {
       const cost = calculateCost(usage.inputTokens, usage.outputTokens, model.inputPrice, model.outputPrice);
 
-      await deductAndLog({
+      deductAndLog({
         apiKeyId: req.apiKey!.id,
         modelId: model.id,
         inputTokens: usage.inputTokens,
@@ -490,7 +490,7 @@ async function handleNonStreamingResponse(
   if (usage.inputTokens > 0 || usage.outputTokens > 0) {
     const cost = calculateCost(usage.inputTokens, usage.outputTokens, model.inputPrice, model.outputPrice);
 
-    await deductAndLog({
+    deductAndLog({
       apiKeyId: req.apiKey!.id,
       modelId: model.id,
       inputTokens: usage.inputTokens,
