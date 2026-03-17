@@ -60,35 +60,53 @@ export function getEffectiveBudget(key: RateLimitKey): BudgetResult {
 
 export async function deductAndLog(entry: UsageLogEntry & { type?: 'flat' | 'rate' }): Promise<void> {
   try {
-  await prisma.$transaction(async (tx) => {
-    const apiKey = await tx.apiKey.findUniqueOrThrow({
-      where: { id: entry.apiKeyId },
-    });
-
-    const isRate = entry.type === 'rate' ||
-      (apiKey.rateLimitAmount != null && apiKey.rateLimitIntervalHours != null);
+    // Use raw SQL for atomic update — avoids interactive transaction lock contention
+    // This is much faster under high concurrency than $transaction read-then-write
+    const isRate = entry.type === 'rate';
+    const totalTokens = entry.inputTokens + entry.outputTokens;
 
     if (isRate) {
-      const now = new Date();
-      const windowMs = apiKey.rateLimitIntervalHours! * 3600_000;
-      const windowExpired = !apiKey.rateLimitWindowStart ||
-        now.getTime() - apiKey.rateLimitWindowStart.getTime() >= windowMs;
+      // Atomic rate-limit update + get balance info in one query
+      const result = await prisma.$queryRawUnsafe<Array<{
+        rate_limit_amount: number;
+        old_spent: number;
+        window_expired: boolean;
+      }>>(
+        `UPDATE api_keys SET
+          rate_limit_window_start = CASE
+            WHEN rate_limit_window_start IS NULL
+              OR EXTRACT(EPOCH FROM (NOW() - rate_limit_window_start)) * 1000 >= rate_limit_interval_hours * 3600000
+            THEN NOW()
+            ELSE rate_limit_window_start
+          END,
+          rate_limit_window_spent = CASE
+            WHEN rate_limit_window_start IS NULL
+              OR EXTRACT(EPOCH FROM (NOW() - rate_limit_window_start)) * 1000 >= rate_limit_interval_hours * 3600000
+            THEN $1
+            ELSE COALESCE(rate_limit_window_spent, 0) + $1
+          END,
+          total_spent = total_spent + $1,
+          total_tokens = total_tokens + $2,
+          updated_at = NOW()
+        WHERE id = $3
+        RETURNING
+          rate_limit_amount,
+          COALESCE(rate_limit_window_spent, 0) - $1 as old_spent,
+          (rate_limit_window_start IS NULL
+            OR EXTRACT(EPOCH FROM (NOW() - rate_limit_window_start)) * 1000 >= rate_limit_interval_hours * 3600000
+          ) as window_expired`,
+        entry.cost,
+        totalTokens,
+        entry.apiKeyId,
+      );
 
-      const currentSpent = windowExpired ? 0 : (apiKey.rateLimitWindowSpent ?? 0);
-      const balanceBefore = apiKey.rateLimitAmount! - currentSpent;
+      const row = result[0];
+      const oldSpent = row?.window_expired ? 0 : (row?.old_spent ?? 0);
+      const balanceBefore = (row?.rate_limit_amount ?? 0) - oldSpent;
       const balanceAfter = balanceBefore - entry.cost;
 
-      await tx.apiKey.update({
-        where: { id: entry.apiKeyId },
-        data: {
-          rateLimitWindowStart: windowExpired ? now : undefined,
-          rateLimitWindowSpent: windowExpired ? entry.cost : { increment: entry.cost },
-          totalSpent: { increment: entry.cost },
-          totalTokens: { increment: entry.inputTokens + entry.outputTokens },
-        },
-      });
-
-      await tx.usageLog.create({
+      // Insert usage log (non-blocking, separate query)
+      await prisma.usageLog.create({
         data: {
           apiKeyId: entry.apiKeyId,
           modelId: entry.modelId,
@@ -107,19 +125,24 @@ export async function deductAndLog(entry: UsageLogEntry & { type?: 'flat' | 'rat
         windowRemaining: balanceAfter,
       });
     } else {
-      const balanceBefore = apiKey.balance;
+      // Atomic flat-plan deduction
+      const result = await prisma.$queryRawUnsafe<Array<{ balance: number }>>(
+        `UPDATE api_keys SET
+          balance = balance - $1,
+          total_spent = total_spent + $1,
+          total_tokens = total_tokens + $2,
+          updated_at = NOW()
+        WHERE id = $3
+        RETURNING balance + $1 as balance`,
+        entry.cost,
+        totalTokens,
+        entry.apiKeyId,
+      );
+
+      const balanceBefore = result[0]?.balance ?? 0;
       const balanceAfter = balanceBefore - entry.cost;
 
-      await tx.apiKey.update({
-        where: { id: entry.apiKeyId },
-        data: {
-          balance: balanceAfter,
-          totalSpent: { increment: entry.cost },
-          totalTokens: { increment: entry.inputTokens + entry.outputTokens },
-        },
-      });
-
-      await tx.usageLog.create({
+      await prisma.usageLog.create({
         data: {
           apiKeyId: entry.apiKeyId,
           modelId: entry.modelId,
@@ -138,9 +161,8 @@ export async function deductAndLog(entry: UsageLogEntry & { type?: 'flat' | 'rat
         balanceAfter,
       });
     }
-  });
   } catch (err) {
-    logger.error('Billing deduction failed (will retry not implemented — usage may be missed)', {
+    logger.error('Billing deduction failed (usage may be missed)', {
       apiKeyId: entry.apiKeyId,
       modelId: entry.modelId,
       cost: entry.cost,
