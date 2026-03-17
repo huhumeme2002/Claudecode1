@@ -1,10 +1,29 @@
 import { Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
+import { LRUCache } from 'lru-cache';
 import prisma from './db';
 import { AuthenticatedRequest } from './types';
 import logger from './logger';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-me';
+
+// Cache API key lookups to avoid DB hit on every proxy request
+// TTL 30s = key changes take up to 30s to propagate (acceptable trade-off)
+const apiKeyCache = new LRUCache<string, {
+  id: string;
+  name: string;
+  key: string;
+  balance: number;
+  enabled: boolean;
+  expiry: Date | null;
+  rateLimitAmount: number | null;
+  rateLimitIntervalHours: number | null;
+  rateLimitWindowStart: Date | null;
+  rateLimitWindowSpent: number | null;
+} | null>({
+  max: 1000,
+  ttl: 30_000,
+});
 
 export function generateToken(): string {
   return jwt.sign({ admin: true }, JWT_SECRET, { expiresIn: '24h' });
@@ -29,6 +48,7 @@ export function verifyAdmin(req: AuthenticatedRequest, res: Response, next: Next
 
 export async function verifyApiKey(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
   // Support both OpenAI-style (Authorization: Bearer) and Anthropic-style (x-api-key)
+  // Prioritize x-api-key because some clients (OpenClaw) send a dummy Bearer token alongside
   const authHeader = req.headers.authorization;
   const xApiKey = req.headers['x-api-key'] as string | undefined;
 
@@ -43,27 +63,46 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
     res.status(401).json({ error: 'Missing or invalid authorization header' });
     return;
   }
+
   try {
-    const apiKey = await prisma.apiKey.findUnique({ where: { key } });
-    if (!apiKey || !apiKey.enabled) {
+    // Check cache first
+    let cached = apiKeyCache.get(key);
+    if (cached === undefined) {
+      // Cache miss — query DB
+      const apiKey = await prisma.apiKey.findUnique({ where: { key } });
+      cached = apiKey ? {
+        id: apiKey.id,
+        name: apiKey.name,
+        key: apiKey.key,
+        balance: apiKey.balance,
+        enabled: apiKey.enabled,
+        expiry: apiKey.expiry,
+        rateLimitAmount: apiKey.rateLimitAmount,
+        rateLimitIntervalHours: apiKey.rateLimitIntervalHours,
+        rateLimitWindowStart: apiKey.rateLimitWindowStart,
+        rateLimitWindowSpent: apiKey.rateLimitWindowSpent,
+      } : null;
+      apiKeyCache.set(key, cached);
+    }
+
+    if (!cached || !cached.enabled) {
       res.status(401).json({ error: 'Invalid or disabled API key' });
       return;
     }
-    req.apiKey = {
-      id: apiKey.id,
-      name: apiKey.name,
-      key: apiKey.key,
-      balance: apiKey.balance,
-      enabled: apiKey.enabled,
-      expiry: apiKey.expiry,
-      rateLimitAmount: apiKey.rateLimitAmount,
-      rateLimitIntervalHours: apiKey.rateLimitIntervalHours,
-      rateLimitWindowStart: apiKey.rateLimitWindowStart,
-      rateLimitWindowSpent: apiKey.rateLimitWindowSpent,
-    };
+
+    req.apiKey = cached;
     next();
   } catch (err) {
     logger.error('API key verification failed', { error: err });
     res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
+// Invalidate a specific key from cache (call after key update/disable)
+export function invalidateApiKeyCache(key?: string): void {
+  if (key) {
+    apiKeyCache.delete(key);
+  } else {
+    apiKeyCache.clear();
   }
 }

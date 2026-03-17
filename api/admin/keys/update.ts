@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { verifyAdmin } from '../../../lib/auth';
+import { verifyAdmin, invalidateApiKeyCache } from '../../../lib/auth';
 import { AuthenticatedRequest } from '../../../lib/types';
 import prisma from '../../../lib/db';
 
@@ -58,6 +58,9 @@ router.put('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =>
       where: { id },
       data,
     });
+
+    // Invalidate cache so updated key takes effect immediately
+    invalidateApiKeyCache(existing.key);
 
     res.json({
       ...updated,

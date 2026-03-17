@@ -10,12 +10,14 @@ router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =>
     const totalKeys = await prisma.apiKey.count();
     const activeKeys = await prisma.apiKey.count({ where: { enabled: true } });
     const totalModels = await prisma.modelMapping.count();
-    const totalRequests = await prisma.usageLog.count();
 
-    const revenueResult = await prisma.usageLog.aggregate({
-      _sum: { cost: true },
-    });
-    const totalRevenue = revenueResult._sum.cost || 0;
+    // Single query for both count and revenue (avoids two full-table scans)
+    const usageStats: any[] = await prisma.$queryRaw`
+      SELECT COUNT(*)::int as total_requests, COALESCE(SUM(cost), 0)::float as total_revenue
+      FROM usage_logs
+    `;
+    const totalRequests = usageStats[0]?.total_requests || 0;
+    const totalRevenue = usageStats[0]?.total_revenue || 0;
 
     // Get usage from last 30 days using SQL GROUP BY (much faster than loading all rows)
     const thirtyDaysAgo = new Date();

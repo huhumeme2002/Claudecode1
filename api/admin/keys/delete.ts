@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { verifyAdmin } from '../../../lib/auth';
+import { verifyAdmin, invalidateApiKeyCache } from '../../../lib/auth';
 import { AuthenticatedRequest } from '../../../lib/types';
 import prisma from '../../../lib/db';
 
@@ -18,6 +18,9 @@ router.delete('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response)
       prisma.usageLog.deleteMany({ where: { apiKeyId: id } }),
       prisma.apiKey.delete({ where: { id } }),
     ]);
+
+    // Invalidate cache for deleted key
+    invalidateApiKeyCache();
 
     res.json({ success: true });
   } catch (error) {
