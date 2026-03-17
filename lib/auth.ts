@@ -9,7 +9,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-me';
 
 // Cache API key lookups to avoid DB hit on every proxy request
 // TTL 30s = key changes take up to 30s to propagate (acceptable trade-off)
-const apiKeyCache = new LRUCache<string, {
+interface CachedApiKey {
   id: string;
   name: string;
   key: string;
@@ -20,7 +20,12 @@ const apiKeyCache = new LRUCache<string, {
   rateLimitIntervalHours: number | null;
   rateLimitWindowStart: Date | null;
   rateLimitWindowSpent: number | null;
-} | null>({
+}
+
+const NOT_FOUND = Symbol('NOT_FOUND');
+type CacheValue = CachedApiKey | typeof NOT_FOUND;
+
+const apiKeyCache = new LRUCache<string, CacheValue>({
   max: 1000,
   ttl: 30_000,
 });
@@ -66,31 +71,46 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
 
   try {
     // Check cache first
-    let cached = apiKeyCache.get(key);
-    if (cached === undefined) {
-      // Cache miss — query DB
-      const apiKey = await prisma.apiKey.findUnique({ where: { key } });
-      cached = apiKey ? {
-        id: apiKey.id,
-        name: apiKey.name,
-        key: apiKey.key,
-        balance: apiKey.balance,
-        enabled: apiKey.enabled,
-        expiry: apiKey.expiry,
-        rateLimitAmount: apiKey.rateLimitAmount,
-        rateLimitIntervalHours: apiKey.rateLimitIntervalHours,
-        rateLimitWindowStart: apiKey.rateLimitWindowStart,
-        rateLimitWindowSpent: apiKey.rateLimitWindowSpent,
-      } : null;
-      apiKeyCache.set(key, cached);
+    const cached = apiKeyCache.get(key);
+    if (cached === NOT_FOUND) {
+      // Cached negative — key doesn't exist
+      res.status(401).json({ error: 'Invalid or disabled API key' });
+      return;
+    }
+    if (cached !== undefined) {
+      // Cache hit
+      if (!cached.enabled) {
+        res.status(401).json({ error: 'Invalid or disabled API key' });
+        return;
+      }
+      req.apiKey = cached;
+      next();
+      return;
     }
 
-    if (!cached || !cached.enabled) {
+    // Cache miss — query DB
+    const apiKey = await prisma.apiKey.findUnique({ where: { key } });
+    if (!apiKey || !apiKey.enabled) {
+      apiKeyCache.set(key, NOT_FOUND);
       res.status(401).json({ error: 'Invalid or disabled API key' });
       return;
     }
 
-    req.apiKey = cached;
+    const entry: CachedApiKey = {
+      id: apiKey.id,
+      name: apiKey.name,
+      key: apiKey.key,
+      balance: apiKey.balance,
+      enabled: apiKey.enabled,
+      expiry: apiKey.expiry,
+      rateLimitAmount: apiKey.rateLimitAmount,
+      rateLimitIntervalHours: apiKey.rateLimitIntervalHours,
+      rateLimitWindowStart: apiKey.rateLimitWindowStart,
+      rateLimitWindowSpent: apiKey.rateLimitWindowSpent,
+    };
+    apiKeyCache.set(key, entry);
+
+    req.apiKey = entry;
     next();
   } catch (err) {
     logger.error('API key verification failed', { error: err });
