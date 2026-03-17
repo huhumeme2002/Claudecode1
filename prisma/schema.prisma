@@ -59,6 +59,7 @@ model UsageLog {
   apiKey        ApiKey       @relation(fields: [apiKeyId], references: [id])
   model         ModelMapping @relation(fields: [modelId], references: [id])
 
+  @@index([createdAt])
   @@index([apiKeyId, createdAt])
   @@map("usage_logs")
 }

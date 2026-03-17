@@ -28,10 +28,14 @@ export class StreamTokenParser {
   processChunk(rawChunk: string): void {
     this.buffer += rawChunk;
 
-    // Split on double newline (SSE event boundary)
-    const parts = this.buffer.split('\n\n');
-    // Keep the last incomplete part in buffer
-    this.buffer = parts.pop() || '';
+    // More efficient split: only split on completed events
+    const lastNewlineIndex = this.buffer.lastIndexOf('\n\n');
+    if (lastNewlineIndex === -1) return;
+
+    const completedEvents = this.buffer.slice(0, lastNewlineIndex);
+    this.buffer = this.buffer.slice(lastNewlineIndex + 2);
+
+    const parts = completedEvents.split('\n\n');
 
     for (const part of parts) {
       const lines = part.split('\n');

@@ -85,7 +85,8 @@ function buildHeaders(apiFormat: string, apiKey: string): Record<string, string>
 // Helper to replace model name in an SSE chunk (swap actual model back to display name)
 function rewriteModelInChunk(chunk: string, actualModel: string, displayName: string): string {
   const actualModelLower = actualModel.toLowerCase();
-  if (!chunk.toLowerCase().includes(actualModelLower)) return chunk;
+  // Performance: Early exit if chunk doesn't contain the actual model name or "data: "
+  if (!chunk.toLowerCase().includes(actualModelLower) || !chunk.includes('data: ')) return chunk;
 
   const lines = chunk.split('\n');
   let rewritten = false;
@@ -121,26 +122,25 @@ function rewriteModelInChunk(chunk: string, actualModel: string, displayName: st
     }
   }
 
-  if (rewritten) {
-    logger.info(`Rewrote model in chunk: ${actualModel} → ${displayName}`);
-  }
   return lines.join('\n');
 }
 
 // Helper to sanitize provider-specific identifiers from raw SSE chunks
 function sanitizeChunk(chunk: string, displayName: string): string {
+  // Performance: Early exit if no keywords found (most common case for mid-content chunks)
+  if (!chunk.includes('minimax') && !chunk.includes('MiniMax') && !chunk.includes('system_fingerprint')) {
+    return chunk;
+  }
+
   let result = chunk;
 
   // 1. SSE event types: minimax:tool_call → content_block_start, other minimax:* → content_block_delta
   result = result.replace(/^event:\s*minimax:tool_call/gm, 'event: content_block_start');
   result = result.replace(/^event:\s*minimax:[a-z_]+/gm, 'event: content_block_delta');
 
-
-  // 3. Specific MiniMax model names
-  result = result.replace(/MiniMax-M2\.5-highspeed/gi, displayName);
-  result = result.replace(/MiniMax-M2\.5/gi, displayName);
-
-  // 4. Catch-all: any remaining "MiniMax"/"minimax" text
+  // 3. Specific MiniMax model names and catch-all
+  // Combine into fewer passes if possible, or use simple string replacements where safe
+  result = result.replace(/MiniMax-M2\.5(-highspeed)?/gi, displayName);
   result = result.replace(/MiniMax/gi, 'Claude');
   result = result.replace(/minimax/gi, 'claude');
 
@@ -390,11 +390,6 @@ async function handleStreamingResponse(
 
         // Parse tokens from chunk
         parser.processChunk(chunk);
-
-        // Debug: log all chunks that contain "model" to see format
-        if (chunk.includes('"model"')) {
-          logger.info(`[${correlationId}] Chunk with model field: ${chunk.substring(0, 800)}`);
-        }
 
         // Rewrite model name back to display name before forwarding
         const rewritten = rewriteModelInChunk(chunk, model.actualModel, displayName);
