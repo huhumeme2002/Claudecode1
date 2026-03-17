@@ -12,7 +12,7 @@ module.exports = {
     {
       name: 'admin-api',
       script: './dist/server-admin.js',
-      instances: 2,
+      instances: 1,
       exec_mode: 'cluster',
       env: {
         NODE_ENV: 'production',

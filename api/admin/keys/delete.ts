@@ -2,6 +2,7 @@ import { Router, Response } from 'express';
 import { verifyAdmin, invalidateApiKeyCache } from '../../../lib/auth';
 import { AuthenticatedRequest } from '../../../lib/types';
 import prisma from '../../../lib/db';
+import logger from '../../../lib/logger';
 
 const router = Router();
 
@@ -24,7 +25,7 @@ router.delete('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response)
 
     res.json({ success: true });
   } catch (error) {
-    console.error('Failed to delete API key:', error);
+    logger.error('Failed to delete API key:', error);
     res.status(500).json({ error: 'Failed to delete API key' });
   }
 });

@@ -1,7 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 
 const databaseUrl = process.env.DATABASE_URL || '';
-const poolParams = 'connection_limit=3&pool_timeout=30';
+const poolParams = 'connection_limit=8&pool_timeout=30';
 const separator = databaseUrl.includes('?') ? '&' : '?';
 
 const prisma = new PrismaClient({

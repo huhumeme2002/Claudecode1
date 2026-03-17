@@ -1,5 +1,5 @@
 import { Router, Response } from 'express';
-import { verifyAdmin } from '../../../lib/auth';
+import { verifyAdmin, invalidateApiKeyCache } from '../../../lib/auth';
 import { AuthenticatedRequest } from '../../../lib/types';
 import prisma from '../../../lib/db';
 
@@ -30,6 +30,8 @@ router.post('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =
       where: { id: key_id },
       data: { expiry: newExpiry },
     });
+
+    invalidateApiKeyCache(key.key);
 
     res.json({
       success: true,

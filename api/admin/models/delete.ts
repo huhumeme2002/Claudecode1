@@ -3,6 +3,7 @@ import { verifyAdmin } from '../../../lib/auth';
 import { AuthenticatedRequest } from '../../../lib/types';
 import prisma from '../../../lib/db';
 import { clearModelCache } from '../../../lib/cache';
+import logger from '../../../lib/logger';
 
 const router = Router();
 
@@ -23,7 +24,7 @@ router.delete('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response)
     clearModelCache();
     res.json({ success: true });
   } catch (error) {
-    console.error('Failed to delete model:', error);
+    logger.error('Failed to delete model:', error);
     res.status(500).json({ error: 'Failed to delete model' });
   }
 });
