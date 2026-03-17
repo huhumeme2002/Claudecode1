@@ -80,12 +80,45 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
       return;
     }
     if (cached !== undefined) {
-      // Cache hit
+      // Cache hit — key exists, check enabled
       if (!cached.enabled) {
         res.status(401).json({ error: 'Invalid or disabled API key' });
         return;
       }
-      req.apiKey = cached;
+
+      // Always fetch fresh budget-critical fields from DB to avoid stale
+      // balance/window data causing wrong reset times or false "invalid key"
+      // errors across PM2 cluster instances with independent caches.
+      try {
+        const freshBudget = await prisma.apiKey.findUnique({
+          where: { id: cached.id },
+          select: {
+            balance: true,
+            enabled: true,
+            rateLimitWindowStart: true,
+            rateLimitWindowSpent: true,
+          },
+        });
+
+        if (!freshBudget || !freshBudget.enabled) {
+          apiKeyCache.set(key, NOT_FOUND);
+          res.status(401).json({ error: 'Invalid or disabled API key' });
+          return;
+        }
+
+        req.apiKey = {
+          ...cached,
+          balance: freshBudget.balance,
+          enabled: freshBudget.enabled,
+          rateLimitWindowStart: freshBudget.rateLimitWindowStart,
+          rateLimitWindowSpent: freshBudget.rateLimitWindowSpent,
+        };
+      } catch (err) {
+        // If DB is unreachable, fall back to cached data rather than failing
+        logger.error('Fresh budget fetch failed, using cached data', { error: err });
+        req.apiKey = cached;
+      }
+
       next();
       return;
     }

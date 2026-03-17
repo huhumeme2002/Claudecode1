@@ -2,15 +2,8 @@ import { Router, Response } from 'express';
 import { verifyApiKey } from '../../lib/auth';
 import { getEffectiveBudget } from '../../lib/billing';
 import { AuthenticatedRequest } from '../../lib/types';
-import { LRUCache } from 'lru-cache';
 
 const router = Router();
-
-// Cache user status for 30 seconds — zero DB queries on repeated F5
-const statusCache = new LRUCache<string, any>({
-  max: 1000,
-  ttl: 30_000,
-});
 
 router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -19,15 +12,8 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       return;
     }
 
-    const cacheKey = req.apiKey.id;
-    const cached = statusCache.get(cacheKey);
-    if (cached) {
-      res.json(cached);
-      return;
-    }
-
-    // ALL data comes from req.apiKey (already cached by auth middleware)
-    // ZERO additional DB queries needed!
+    // ALL data comes from req.apiKey (auth middleware now fetches fresh budget data)
+    // No extra caching layer needed — auth.ts handles it
     const budget = getEffectiveBudget(req.apiKey);
     const isRate = budget.type === 'rate';
 
@@ -68,7 +54,6 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       expired,
     };
 
-    statusCache.set(cacheKey, data);
     res.json(data);
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch status' });
