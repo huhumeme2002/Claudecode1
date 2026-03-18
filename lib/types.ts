@@ -12,6 +12,8 @@ export interface AuthenticatedRequest extends Request {
     rateLimitIntervalHours: number | null;
     rateLimitWindowStart: Date | null;
     rateLimitWindowSpent: number | null;
+    totalSpent: number;
+    totalTokens: number;
   };
   adminAuth?: boolean;
 }
