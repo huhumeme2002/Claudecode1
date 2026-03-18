@@ -9,6 +9,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'default-secret-change-me';
 
 // Cache API key lookups to avoid DB hit on every proxy request
 // TTL 30s = key changes take up to 30s to propagate (acceptable trade-off)
+// cachedAt = timestamp of last DB fetch; budget fields are re-fetched if >BUDGET_TTL_MS stale
+const BUDGET_TTL_MS = 5_000; // Re-read balance/window from DB at most once per 5s per key
+
 interface CachedApiKey {
   id: string;
   name: string;
@@ -22,6 +25,7 @@ interface CachedApiKey {
   rateLimitWindowSpent: number | null;
   totalSpent: number;
   totalTokens: number;
+  cachedAt: number; // ms timestamp when budget fields were last fetched from DB
 }
 
 const NOT_FOUND = Symbol('NOT_FOUND');
@@ -86,36 +90,45 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
         return;
       }
 
-      // Always fetch fresh budget-critical fields from DB to avoid stale
-      // balance/window data causing wrong reset times or false "invalid key"
-      // errors across PM2 cluster instances with independent caches.
-      try {
-        const freshBudget = await prisma.apiKey.findUnique({
-          where: { id: cached.id },
-          select: {
-            balance: true,
-            enabled: true,
-            rateLimitWindowStart: true,
-            rateLimitWindowSpent: true,
-          },
-        });
+      // Re-fetch budget fields from DB at most once per BUDGET_TTL_MS (5s) per key.
+      // This reduces DB load by ~99% vs fetching on every request, while keeping
+      // balance/window data fresh enough for accurate rate-limit enforcement.
+      // Billing is batched (5s flush), so data beyond 5s stale has no real accuracy gain.
+      const now = Date.now();
+      if (now - cached.cachedAt >= BUDGET_TTL_MS) {
+        try {
+          const freshBudget = await prisma.apiKey.findUnique({
+            where: { id: cached.id },
+            select: {
+              balance: true,
+              enabled: true,
+              rateLimitWindowStart: true,
+              rateLimitWindowSpent: true,
+            },
+          });
 
-        if (!freshBudget || !freshBudget.enabled) {
-          apiKeyCache.set(key, NOT_FOUND);
-          res.status(401).json({ error: 'Invalid or disabled API key' });
-          return;
+          if (!freshBudget || !freshBudget.enabled) {
+            apiKeyCache.set(key, NOT_FOUND);
+            res.status(401).json({ error: 'Invalid or disabled API key' });
+            return;
+          }
+
+          const updated: CachedApiKey = {
+            ...cached,
+            balance: freshBudget.balance,
+            enabled: freshBudget.enabled,
+            rateLimitWindowStart: freshBudget.rateLimitWindowStart,
+            rateLimitWindowSpent: freshBudget.rateLimitWindowSpent,
+            cachedAt: now,
+          };
+          apiKeyCache.set(key, updated);
+          req.apiKey = updated;
+        } catch (err) {
+          // If DB is unreachable, fall back to cached data rather than failing
+          logger.error('Fresh budget fetch failed, using cached data', { error: err });
+          req.apiKey = cached;
         }
-
-        req.apiKey = {
-          ...cached,
-          balance: freshBudget.balance,
-          enabled: freshBudget.enabled,
-          rateLimitWindowStart: freshBudget.rateLimitWindowStart,
-          rateLimitWindowSpent: freshBudget.rateLimitWindowSpent,
-        };
-      } catch (err) {
-        // If DB is unreachable, fall back to cached data rather than failing
-        logger.error('Fresh budget fetch failed, using cached data', { error: err });
+      } else {
         req.apiKey = cached;
       }
 
@@ -144,6 +157,7 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
       rateLimitWindowSpent: apiKey.rateLimitWindowSpent,
       totalSpent: apiKey.totalSpent,
       totalTokens: Number(apiKey.totalTokens),
+      cachedAt: Date.now(),
     };
     apiKeyCache.set(key, entry);
 

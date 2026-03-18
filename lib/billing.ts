@@ -91,7 +91,7 @@ export function deductAndLog(entry: UsageLogEntry & { type?: 'flat' | 'rate' }):
     timestamp: new Date(),
   });
 
-  logger.info('Billing queued', {
+  logger.debug('Billing queued', {
     apiKeyId: entry.apiKeyId,
     modelId: entry.modelId,
     cost: entry.cost,
