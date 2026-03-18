@@ -46,7 +46,7 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       rate_limit_window_spent: effectiveSpent,
       rate_limit_window_remaining: isRate ? budget.remaining : null,
       rate_limit_window_resets_at: isRate ? budget.windowResetAt : null,
-      total_spent: (req.apiKey as any).totalSpent || 0,
+      total_spent: req.apiKey.totalSpent || 0,
       total_input_tokens: 0,  // Not available without DB query — acceptable tradeoff
       total_output_tokens: 0,
       expiry: req.apiKey.expiry,

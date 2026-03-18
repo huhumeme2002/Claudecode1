@@ -15,6 +15,12 @@ router.delete('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
+    const existing = await prisma.apiKey.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'API key not found' });
+      return;
+    }
+
     await prisma.$transaction([
       prisma.usageLog.deleteMany({ where: { apiKeyId: id } }),
       prisma.apiKey.delete({ where: { id } }),

@@ -14,6 +14,17 @@ router.post('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =
       return;
     }
 
+    if (typeof balance !== 'number') {
+      res.status(400).json({ error: 'Balance must be a number' });
+      return;
+    }
+
+    const existing = await prisma.apiKey.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'API key not found' });
+      return;
+    }
+
     const apiKey = await prisma.apiKey.update({
       where: { id },
       data: { balance },

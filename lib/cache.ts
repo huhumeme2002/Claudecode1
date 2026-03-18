@@ -50,7 +50,3 @@ export function clearSettingsCache(): void {
   settingsCache.clear();
 }
 
-export function clearAllCaches(): void {
-  modelCache.clear();
-  settingsCache.clear();
-}

@@ -16,6 +16,17 @@ router.put('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =>
       return;
     }
 
+    if (apiFormat !== undefined && apiFormat !== 'openai' && apiFormat !== 'anthropic') {
+      res.status(400).json({ error: 'apiFormat must be "openai" or "anthropic"' });
+      return;
+    }
+
+    const existing = await prisma.modelMapping.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Model not found' });
+      return;
+    }
+
     // Only allow whitelisted fields to prevent overwriting id, createdAt, etc.
     const data: Record<string, any> = {};
     if (displayName !== undefined) data.displayName = displayName;

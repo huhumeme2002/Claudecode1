@@ -16,6 +16,12 @@ router.delete('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
+    const existing = await prisma.modelMapping.findUnique({ where: { id } });
+    if (!existing) {
+      res.status(404).json({ error: 'Model not found' });
+      return;
+    }
+
     await prisma.$transaction([
       prisma.usageLog.deleteMany({ where: { modelId: id } }),
       prisma.modelMapping.delete({ where: { id } }),

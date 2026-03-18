@@ -299,8 +299,8 @@ async function handleProxy(req: AuthenticatedRequest, res: Response, clientPath:
       });
     }
 
-    // Debug: log all upstream response headers
-    logger.info(`[${correlationId}] Upstream response headers:`, Object.fromEntries(upstreamResponse.headers.entries()));
+    // Debug: log all upstream response headers (debug only — headers may contain sensitive info)
+    logger.debug(`[${correlationId}] Upstream response headers:`, Object.fromEntries(upstreamResponse.headers.entries()));
 
     // Handle streaming response
     if (isStreaming) {
@@ -338,11 +338,8 @@ async function handleStreamingResponse(
   res.setHeader('Connection', 'keep-alive');
 
   // Selectively forward safe upstream headers — block provider-specific ones
-  const safeHeaders = new Set([
-    'content-type', 'cache-control', 'connection',
-    'x-request-id', 'request-id',
-  ]);
   const blockedPrefixes = ['x-minimax', 'x-mm-', 'cf-', 'server'];
+  const passthroughHeaders = new Set(['x-request-id', 'request-id']);
 
   upstreamResponse.headers.forEach((value, key) => {
     const lowerKey = key.toLowerCase();
@@ -356,6 +353,11 @@ async function handleStreamingResponse(
     // Block provider-specific headers that could leak identity
     if (blockedPrefixes.some(p => lowerKey.startsWith(p))) return;
     if (lowerKey.includes('minimax')) return;
+
+    // Forward safe passthrough headers (e.g. x-request-id for tracing)
+    if (passthroughHeaders.has(lowerKey)) {
+      res.setHeader(key, value);
+    }
   });
 
   const parser = new StreamTokenParser(model.apiFormat);
@@ -461,6 +463,7 @@ async function handleNonStreamingResponse(
 
   // Selectively forward safe upstream headers — block provider-specific ones
   const blockedPrefixes = ['x-minimax', 'x-mm-', 'cf-', 'server'];
+  const passthroughHeaders = new Set(['x-request-id', 'request-id']);
 
   upstreamResponse.headers.forEach((value, key) => {
     const lowerKey = key.toLowerCase();
@@ -474,6 +477,11 @@ async function handleNonStreamingResponse(
     // Block provider-specific headers that could leak identity
     if (blockedPrefixes.some(p => lowerKey.startsWith(p))) return;
     if (lowerKey.includes('minimax')) return;
+
+    // Forward safe passthrough headers (e.g. x-request-id for tracing)
+    if (passthroughHeaders.has(lowerKey)) {
+      res.setHeader(key, value);
+    }
   });
 
   // Parse token usage based on format

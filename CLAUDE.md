@@ -23,8 +23,9 @@ npx prisma generate            # Generate Prisma client from schema
 npx prisma migrate dev         # Run database migrations (dev)
 npx prisma migrate deploy      # Run database migrations (prod)
 npm run build                  # Compile TS + copy public/ to dist/
-npm start                      # Start server (or: pm2 start ecosystem.config.js)
+npm start                      # Start proxy server only (port 3000)
 npm run dev                    # Dev mode via ts-node (run manually in terminal)
+pm2 start ecosystem.config.js  # Start both servers in production
 ```
 
 TypeScript compiles to `dist/` (CommonJS, ES2020 target). The build script also copies `public/` into `dist/public/` for static serving.
@@ -68,13 +69,22 @@ API keys support two mutually exclusive billing modes:
 
 Route path is derived from file path: `api/admin/keys/create.ts` → `/api/admin/keys/create`.
 
+### Dual-Server Architecture
+
+PM2 runs two processes (`ecosystem.config.js`):
+- **`server.ts`** (port `PORT`, 5 cluster instances) — proxy + all API routes
+- **`server-admin.ts`** (port `ADMIN_PORT=3001`, 1 instance) — admin/user API routes only, no proxy. Keeps dashboard/admin traffic from competing with 1264+ proxy connections.
+
+Both servers use the same dynamic route loader (skipping `proxy.js`). Add `ADMIN_PORT` to `.env` if running locally with the admin server.
+
 ### Key Modules
 
 - `api/proxy.ts` — Core proxy with multi-provider routing, streaming SSE forwarding, and token extraction
 - `lib/token-parser.ts` — Extracts token counts from both OpenAI and Anthropic response formats (stream and non-stream). `StreamTokenParser` buffers SSE chunks and parses on `\n\n` boundaries.
 - `lib/billing.ts` — Cost calculation (`$/million tokens`), budget checking, balance deduction, and usage logging in a single Prisma transaction
-- `lib/cache.ts` — LRU cache for model mappings and settings; call `clearModelCache()` / `clearSettingsCache()` on any admin update
+- `lib/cache.ts` — LRU cache for model mappings and settings; call `clearModelCache()` / `clearSettingsCache()` / `clearAllCaches()` on any admin update
 - `lib/auth.ts` — `verifyAdmin` middleware (JWT) and `verifyApiKey` middleware (API key lookup). Both read `Authorization: Bearer <token>` header.
+- `lib/logger.ts` — Winston logger singleton. Level: `debug` in dev, `info` in prod. Import as `import logger from './lib/logger'`. Also exports `correlationId()`.
 - `lib/db.ts` — Prisma client singleton (never instantiate per-request)
 - `lib/types.ts` — Shared TypeScript interfaces (`AuthenticatedRequest`, `TokenUsage`, `UsageLogEntry`, etc.)
 - `lib/utils.ts` — `generateApiKey()` (sk-prefixed hex) and `generateId()` (UUIDv4)

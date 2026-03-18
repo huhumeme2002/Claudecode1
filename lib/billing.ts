@@ -73,6 +73,7 @@ interface QueuedEntry {
 const billingQueue: QueuedEntry[] = [];
 const FLUSH_INTERVAL_MS = 5_000; // Flush every 5 seconds
 const MAX_QUEUE_SIZE = 200;      // Force flush if queue gets too large
+const MAX_RETRY_QUEUE_SIZE = 500; // Hard cap after retry re-inserts — drop oldest if exceeded
 let flushTimer: NodeJS.Timeout | null = null;
 
 /**
@@ -155,6 +156,12 @@ async function flushBillingQueue(): Promise<void> {
     logger.error('Billing flush failed', { entries: entries.length, error: err });
     // Put entries back at the front of the queue for retry
     billingQueue.unshift(...entries);
+
+    // Hard cap: if queue exceeds limit after retry re-insert, drop oldest entries to prevent OOM
+    if (billingQueue.length > MAX_RETRY_QUEUE_SIZE) {
+      const dropped = billingQueue.splice(MAX_RETRY_QUEUE_SIZE);
+      logger.error(`Billing queue overflow — dropped ${dropped.length} entries to prevent OOM. Persistent DB failure suspected.`);
+    }
   }
 }
 

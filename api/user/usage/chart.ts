@@ -21,7 +21,7 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
     const since = new Date(Date.now() - days * 86400_000);
     const rows: any[] = await prisma.$queryRaw`
       SELECT
-        DATE(created_at) as date,
+        DATE(created_at AT TIME ZONE 'Asia/Ho_Chi_Minh') as date,
         COALESCE(SUM(cost), 0) as cost,
         COALESCE(SUM(input_tokens), 0) as input_tokens,
         COALESCE(SUM(output_tokens), 0) as output_tokens,
@@ -29,7 +29,7 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
       FROM usage_logs
       WHERE api_key_id = ${req.apiKey.id}
         AND created_at >= ${since}
-      GROUP BY DATE(created_at)
+      GROUP BY DATE(created_at AT TIME ZONE 'Asia/Ho_Chi_Minh')
       ORDER BY date ASC
     `;
 

@@ -38,7 +38,7 @@ router.post('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =
         id: generateId(),
         name,
         key,
-        balance: isRatePlan ? 0 : (balance || 0),
+        balance: isRatePlan ? 0 : (parseFloat(balance) || 0),
         enabled: true,
         expiry: expiryDate,
         ...(isRatePlan ? {
