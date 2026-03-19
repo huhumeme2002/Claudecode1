@@ -43,7 +43,7 @@ export function generateToken(): string {
 export function verifyAdmin(req: AuthenticatedRequest, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401).json({ error: 'Missing or invalid authorization header' });
+    res.status(401).json({ type: 'error', error: { type: 'authentication_error', message: 'Invalid API key' } });
     return;
   }
 
@@ -53,7 +53,7 @@ export function verifyAdmin(req: AuthenticatedRequest, res: Response, next: Next
     req.adminAuth = true;
     next();
   } catch {
-    res.status(401).json({ error: 'Invalid or expired token' });
+    res.status(401).json({ type: 'error', error: { type: 'authentication_error', message: 'Invalid or expired token' } });
   }
 }
 
@@ -71,7 +71,7 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
   }
 
   if (!key) {
-    res.status(401).json({ error: 'Missing or invalid authorization header' });
+    res.status(401).json({ type: 'error', error: { type: 'authentication_error', message: 'Invalid API key' } });
     return;
   }
 
@@ -80,13 +80,13 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
     const cached = apiKeyCache.get(key);
     if (cached === NOT_FOUND) {
       // Cached negative — key doesn't exist
-      res.status(401).json({ error: 'Invalid or disabled API key' });
+      res.status(401).json({ type: 'error', error: { type: 'authentication_error', message: 'Invalid API key' } });
       return;
     }
     if (cached !== undefined) {
       // Cache hit — key exists, check enabled
       if (!cached.enabled) {
-        res.status(401).json({ error: 'Invalid or disabled API key' });
+        res.status(401).json({ type: 'error', error: { type: 'authentication_error', message: 'Invalid API key' } });
         return;
       }
 
@@ -109,7 +109,7 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
 
           if (!freshBudget || !freshBudget.enabled) {
             apiKeyCache.set(key, NOT_FOUND);
-            res.status(401).json({ error: 'Invalid or disabled API key' });
+            res.status(401).json({ type: 'error', error: { type: 'authentication_error', message: 'Invalid API key' } });
             return;
           }
 
@@ -140,7 +140,7 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
     const apiKey = await prisma.apiKey.findUnique({ where: { key } });
     if (!apiKey || !apiKey.enabled) {
       apiKeyCache.set(key, NOT_FOUND);
-      res.status(401).json({ error: 'Invalid or disabled API key' });
+      res.status(401).json({ type: 'error', error: { type: 'authentication_error', message: 'Invalid API key' } });
       return;
     }
 
@@ -165,7 +165,7 @@ export async function verifyApiKey(req: AuthenticatedRequest, res: Response, nex
     next();
   } catch (err) {
     logger.error('API key verification failed', { error: err });
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ type: 'error', error: { type: 'api_error', message: 'An unexpected error occurred. Please try again later.' } });
   }
 }
 

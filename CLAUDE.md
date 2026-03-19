@@ -43,6 +43,7 @@ Required in `.env`:
 - `ADMIN_PASSWORD` — Admin login password
 - `JWT_SECRET` — 32-char hex for JWT signing
 - `PORT` — Express port (default 3000)
+- `ADMIN_PORT` — Admin server port (default 3001, used by `server-admin.ts`)
 - `NODE_ENV` — production/development
 
 ## Architecture
@@ -81,7 +82,7 @@ Both servers use the same dynamic route loader (skipping `proxy.js`). Add `ADMIN
 
 - `api/proxy.ts` — Core proxy with multi-provider routing, streaming SSE forwarding, and token extraction
 - `lib/token-parser.ts` — Extracts token counts from both OpenAI and Anthropic response formats (stream and non-stream). `StreamTokenParser` buffers SSE chunks and parses on `\n\n` boundaries.
-- `lib/billing.ts` — Cost calculation (`$/million tokens`), budget checking, balance deduction, and usage logging in a single Prisma transaction
+- `lib/billing.ts` — Cost calculation (`$/million tokens`), budget checking, and batch billing queue (see below)
 - `lib/cache.ts` — LRU cache for model mappings and settings; call `clearModelCache()` / `clearSettingsCache()` / `clearAllCaches()` on any admin update
 - `lib/auth.ts` — `verifyAdmin` middleware (JWT) and `verifyApiKey` middleware (API key lookup). Both read `Authorization: Bearer <token>` header.
 - `lib/logger.ts` — Winston logger singleton. Level: `debug` in dev, `info` in prod. Import as `import logger from './lib/logger'`. Also exports `correlationId()`.
@@ -106,19 +107,38 @@ For OpenAI streaming, the proxy injects `stream_options: { include_usage: true }
 
 Priority: global master switch → per-model disable flag → per-model prompt → global prompt fallback. Anthropic format uses top-level `system` field; OpenAI format prepends/replaces system message in messages array. Max 10,000 chars, truncated silently.
 
+### Batch Billing Queue
+
+Billing does NOT write to the database per-request. Instead, `deductAndLog()` pushes entries to an in-memory queue. A background timer flushes the queue every 5 seconds (or when it reaches 200 entries). On flush, entries are grouped by `apiKeyId` and each group executes a single atomic `UPDATE` (raw SQL) + batch `INSERT` for usage logs. Failed flushes re-queue entries (capped at 500 to prevent OOM). Graceful flush runs on `SIGINT`/`SIGTERM` for PM2 restarts.
+
+This means balance/spent values are eventually consistent (up to 5s delay), not per-request accurate.
+
+### Provider Identity Sanitization
+
+The proxy scrubs upstream provider identifiers from responses to present a uniform API surface. This includes: rewriting model names back to display names in SSE chunks and response bodies, stripping provider-specific headers (`x-minimax-*`, `cf-*`, `server`), replacing MiniMax references with "Claude", removing `system_fingerprint`, and remapping provider-specific SSE event types.
+
+### Magic String Refusal
+
+The proxy checks for `ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL_*` in message content and returns a 400 `invalid_request_error` without forwarding to upstream — mimics real Claude behavior for clients that test for this.
+
 ### Token Parsing by Format
 
 - **OpenAI**: `usage.prompt_tokens` / `usage.completion_tokens` (stream: final chunk; non-stream: response body)
 - **Anthropic**: `message.usage.input_tokens` (message_start event) / `usage.output_tokens` (message_delta event)
+
+## Testing
+
+No test framework is configured. There are no automated tests in this codebase.
 
 ## Critical Rules
 
 1. Never deduct balance before upstream responds — only after confirmed 2xx with token usage
 2. Balance can go negative on the last request — check before, deduct after
 3. All money values are dollars with decimals (e.g., 10.50), not cents. Cost precision: 8 decimal places (`Math.round(x * 1e8) / 1e8`)
-4. Use Prisma transactions for billing — deduct balance + insert usage log + update lifetime stats atomically
+4. Billing uses a batch queue — `deductAndLog()` is fire-and-forget (no await). Balance updates and usage logs are flushed to DB every 5s, not inline
 5. Cache model mappings aggressively (60s TTL), clear cache on any admin update
 6. Stream handling must include SSE heartbeat every 15s to prevent timeout
-7. Upstream errors (4xx/5xx) must NOT deduct balance
+7. Upstream errors (4xx/5xx) must NOT deduct balance — return Anthropic-compatible error format instead of raw upstream error
 8. API keys have optional expiry — proxy checks `expiry` before budget check and returns 403 if expired
 9. When adding new API routes, just create a file under `api/` — the dynamic loader picks it up automatically (export default Router)
+10. Never leak upstream provider identity — sanitize model names, headers, and SSE events before returning to client
