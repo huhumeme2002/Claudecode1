@@ -34,14 +34,14 @@ router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =>
       prisma.modelMapping.count(),
       prisma.$queryRaw<any[]>`
         SELECT
-          (created_at AT TIME ZONE '+07')::date as date,
+          vn_date(created_at) as date,
           COUNT(*)::int as requests,
           COALESCE(SUM(input_tokens), 0)::int as "inputTokens",
           COALESCE(SUM(output_tokens), 0)::int as "outputTokens",
           COALESCE(SUM(cost), 0)::float as cost
         FROM usage_logs
         WHERE created_at >= ${thirtyDaysAgo}
-        GROUP BY (created_at AT TIME ZONE '+07')::date
+        GROUP BY vn_date(created_at)
         ORDER BY date ASC
       `,
     ]);

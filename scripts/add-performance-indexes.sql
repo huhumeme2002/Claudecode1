@@ -1,23 +1,23 @@
 -- Performance indexes for usage_logs table
 -- Run this MANUALLY on the PostgreSQL server:
---   psql $DATABASE_URL -f scripts/add-performance-indexes.sql
+--   psql <connection_string> -f scripts/add-performance-indexes.sql
 --
--- These use CONCURRENTLY to avoid locking the table during creation.
--- Each index may take several minutes on large tables.
---
--- NOTE: Uses fixed UTC offset '+07' instead of 'Asia/Ho_Chi_Minh'
--- because PostgreSQL requires IMMUTABLE expressions for indexes.
--- Vietnam does not observe DST, so +07 is always correct.
+-- Uses a helper function marked IMMUTABLE so PostgreSQL allows expression indexes.
+-- Vietnam has no DST, so UTC+7 via INTERVAL is always correct.
 
--- 1. Expression index for admin dashboard: GROUP BY date (VN timezone) across all keys
+-- 1. Create IMMUTABLE helper: timestamptz → Vietnam date
+CREATE OR REPLACE FUNCTION vn_date(ts timestamptz) RETURNS date
+LANGUAGE sql IMMUTABLE PARALLEL SAFE
+AS $$ SELECT (ts AT TIME ZONE INTERVAL '7 hours')::date $$;
+
+-- 2. Expression index for admin dashboard: GROUP BY vn_date across all keys
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_usage_logs_datevn
-  ON usage_logs (((created_at AT TIME ZONE '+07')::date));
+  ON usage_logs (vn_date(created_at));
 
--- 2. Expression index for user chart: GROUP BY date (VN timezone) filtered by api_key_id
+-- 3. Expression index for user chart: GROUP BY vn_date filtered by api_key_id
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_usage_logs_apikey_datevn
-  ON usage_logs (api_key_id, ((created_at AT TIME ZONE '+07')::date));
+  ON usage_logs (api_key_id, vn_date(created_at));
 
--- 3. Composite index for summary: GROUP BY model_id filtered by api_key_id
--- (also added to Prisma schema — this is a backup if prisma db push hasn't run yet)
+-- 4. Composite index for summary: GROUP BY model_id filtered by api_key_id
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_usage_logs_apikey_model
   ON usage_logs (api_key_id, model_id);
