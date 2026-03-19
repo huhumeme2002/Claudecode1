@@ -8,7 +8,7 @@ const state = {
 async function api(endpoint, opts = {}) {
     const headers = { 'Content-Type': 'application/json', ...opts.headers };
     if (state.apiKey) headers['Authorization'] = `Bearer ${state.apiKey}`;
-    const res = await fetch(endpoint, { ...opts, headers });
+    const res = await fetch(endpoint, { ...opts, headers, cache: 'no-store' });
     if (res.status === 401) { logout(); throw new Error('Key không hợp lệ'); }
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Lỗi');
