@@ -348,32 +348,91 @@ function updateGuideKey() {
 
 // Upgrade / Renew
 const upgradePlans = [
-    { id: 'trial', name: 'Dùng thử', price: 50000, priceLabel: '50.000đ', detail: '20 credit/5h • 1 ngày', credit: 20 },
-    { id: 'week', name: 'Gói Tuần', price: 150000, priceLabel: '150.000đ', detail: '50 credit/5h • 7 ngày', credit: 50 },
-    { id: 'pro', name: 'Pro', price: 159000, priceLabel: '159.000đ', detail: '20 credit/5h • 1 tháng', credit: 20 },
-    { id: 'max5x', name: 'Max 5x', price: 250000, priceLabel: '250.000đ', detail: '50 credit/5h • 1 tháng', credit: 50 },
-    { id: 'max20x', name: 'Max 20x', price: 450000, priceLabel: '450.000đ', detail: '100 credit/5h • 1 tháng', credit: 100 },
+    { id: 'trial', name: 'Dùng thử', price: 50000, priceLabel: '50.000đ', detail: '20 credit/5h • 1 ngày' },
+    { id: 'week', name: 'Gói Tuần', price: 150000, priceLabel: '150.000đ', detail: '50 credit/5h • 7 ngày' },
+    { id: 'pro', name: 'Pro', price: 159000, priceLabel: '159.000đ', detail: '20 credit/5h • 1 tháng' },
+    { id: 'max5x', name: 'Max 5x', price: 250000, priceLabel: '250.000đ', detail: '50 credit/5h • 1 tháng' },
+    { id: 'max20x', name: 'Max 20x', price: 450000, priceLabel: '450.000đ', detail: '100 credit/5h • 1 tháng' },
 ];
 
 function renderUpgradeGrid() {
     var grid = document.getElementById('upgradeGrid');
     if (!grid) return;
-    var currentCredit = state.status ? state.status.rate_limit_amount : 0;
     grid.innerHTML = upgradePlans.map(function(p) {
-        var isCurrent = currentCredit === p.credit && state.status && !state.status.expired;
-        return '<div class="upgrade-card' + (isCurrent ? ' current' : '') + '" ' +
-            (isCurrent ? '' : 'onclick="startUpgrade(\'' + p.id + '\')"') + '>' +
+        return '<div class="upgrade-card" onclick="selectUpgrade(\'' + p.id + '\')">' +
             '<div class="upgrade-card-name">' + p.name + '</div>' +
             '<div class="upgrade-card-price">' + p.priceLabel + '</div>' +
             '<div class="upgrade-card-detail">' + p.detail + '</div>' +
-            (isCurrent ? '<div class="upgrade-card-badge" style="background:rgba(16,185,129,0.15);color:#10b981;">Gói hiện tại</div>' : '<div class="upgrade-card-badge" style="background:rgba(99,102,241,0.1);color:var(--accent);">Chọn gói này</div>') +
+            '<div class="upgrade-card-badge" style="background:rgba(99,102,241,0.1);color:var(--accent);">Chọn gói này</div>' +
             '</div>';
     }).join('');
 }
 
-function startUpgrade(planId) {
-    // Redirect to landing page checkout with plan pre-selected
-    window.location.href = '/?upgrade=' + planId + '#plans';
+var selectedUpgradePlan = null;
+
+function selectUpgrade(planId) {
+    selectedUpgradePlan = upgradePlans.find(function(p) { return p.id === planId; });
+    if (!selectedUpgradePlan) return;
+
+    // Highlight selected card
+    document.querySelectorAll('.upgrade-card').forEach(function(c) { c.style.borderColor = ''; });
+    event.currentTarget.style.borderColor = 'var(--accent)';
+
+    // Show checkout form
+    var form = document.getElementById('upgradeForm');
+    document.getElementById('upgradePlanName').textContent = selectedUpgradePlan.name;
+    document.getElementById('upgradePlanPrice').textContent = selectedUpgradePlan.priceLabel;
+    document.getElementById('upgradePlanDetail').textContent = selectedUpgradePlan.detail;
+    document.getElementById('upgradeError').style.display = 'none';
+    document.getElementById('upgradeSubmitBtn').textContent = 'Thanh toán ' + selectedUpgradePlan.priceLabel;
+    document.getElementById('upgradeSubmitBtn').disabled = false;
+    form.style.display = 'block';
+    form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+async function submitUpgrade() {
+    if (!selectedUpgradePlan) return;
+    var name = document.getElementById('upgradeName').value.trim();
+    var email = document.getElementById('upgradeEmail').value.trim();
+    var phone = document.getElementById('upgradePhone').value.trim();
+    var errEl = document.getElementById('upgradeError');
+    var btn = document.getElementById('upgradeSubmitBtn');
+
+    if (!name) { errEl.style.display = 'block'; errEl.textContent = 'Vui lòng nhập họ tên'; return; }
+    if (!email) { errEl.style.display = 'block'; errEl.textContent = 'Vui lòng nhập email'; return; }
+    errEl.style.display = 'none';
+    var origText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = 'Đang xử lý...';
+
+    try {
+        var res = await fetch('/checkout/create-order', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan_id: selectedUpgradePlan.id, customer_name: name, customer_email: email, customer_phone: phone }),
+            cache: 'no-store'
+        });
+        var data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Lỗi');
+
+        var form = document.createElement('form');
+        form.method = 'POST';
+        form.action = data.actionUrl;
+        for (var k in data.params) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = k;
+            input.value = String(data.params[k]);
+            form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
+    } catch (e) {
+        errEl.style.display = 'block';
+        errEl.textContent = e.message || 'Đã xảy ra lỗi';
+        btn.disabled = false;
+        btn.textContent = origText;
+    }
 }
 
 // Init
