@@ -12,7 +12,7 @@ const router = Router();
 // ─── Create Order ──────────────────────────────────────────────────────────
 router.post('/create-order', async (req: Request, res: Response) => {
   try {
-    const { plan_id, customer_name, customer_phone, customer_email } = req.body;
+    const { plan_id, customer_name, customer_phone, customer_email, existing_api_key } = req.body;
 
     if (!plan_id || !customer_name) {
       res.status(400).json({ error: 'plan_id và customer_name là bắt buộc' });
@@ -25,6 +25,13 @@ router.post('/create-order', async (req: Request, res: Response) => {
       return;
     }
 
+    // If user has an existing key (upgrading from dashboard), link it
+    let existingKeyId: string | null = null;
+    if (existing_api_key) {
+      const keyRecord = await prisma.apiKey.findUnique({ where: { key: existing_api_key } });
+      if (keyRecord) existingKeyId = keyRecord.id;
+    }
+
     const orderCode = generateOrderCode();
 
     await prisma.order.create({
@@ -35,6 +42,7 @@ router.post('/create-order', async (req: Request, res: Response) => {
         customerName: customer_name,
         customerEmail: customer_email || null,
         customerPhone: customer_phone || null,
+        apiKeyId: existingKeyId,
         paymentMethod: 'sepay',
         status: 'pending',
       },
@@ -60,14 +68,14 @@ router.post('/create-order', async (req: Request, res: Response) => {
 });
 
 // ─── Activate Order (shared logic) ────────────────────────────────────────
-async function activateOrder(orderCode: string): Promise<{ apiKey: string; order: any } | null> {
+async function activateOrder(orderCode: string): Promise<{ apiKey: string; order: any; isUpgrade: boolean } | null> {
   const order = await prisma.order.findUnique({ where: { orderCode } });
   if (!order) return null;
 
   // Already paid — return existing key
   if (order.status === 'paid' && order.apiKeyId) {
     const existingKey = await prisma.apiKey.findUnique({ where: { id: order.apiKeyId } });
-    return existingKey ? { apiKey: existingKey.key, order } : null;
+    return existingKey ? { apiKey: existingKey.key, order, isUpgrade: false } : null;
   }
 
   if (order.status !== 'pending') return null;
@@ -75,50 +83,90 @@ async function activateOrder(orderCode: string): Promise<{ apiKey: string; order
   const plan = getPlan(order.planId);
   if (!plan) return null;
 
-  const expiry = new Date();
-  expiry.setDate(expiry.getDate() + plan.durationDays);
+  let finalKey: string;
+  let keyId: string;
 
-  // Create API key + update order in transaction
-  const newKey = generateApiKey();
-  const [apiKeyRecord] = await prisma.$transaction([
-    prisma.apiKey.create({
+  // Check if upgrading an existing key
+  if (order.apiKeyId) {
+    const existingKey = await prisma.apiKey.findUnique({ where: { id: order.apiKeyId } });
+    if (existingKey) {
+      // Extend expiry: if key still valid, add days on top; if expired, start from now
+      const now = new Date();
+      const currentExpiry = existingKey.expiry ? new Date(existingKey.expiry) : now;
+      const baseDate = currentExpiry > now ? currentExpiry : now;
+      const newExpiry = new Date(baseDate);
+      newExpiry.setDate(newExpiry.getDate() + plan.durationDays);
+
+      await prisma.apiKey.update({
+        where: { id: existingKey.id },
+        data: {
+          enabled: true,
+          expiry: newExpiry,
+          rateLimitAmount: plan.rateLimitAmount,
+          rateLimitIntervalHours: plan.rateLimitIntervalHours,
+          rateLimitWindowStart: now,
+          rateLimitWindowSpent: 0,
+        },
+      });
+
+      invalidateApiKeyCache(existingKey.key);
+      finalKey = existingKey.key;
+      keyId = existingKey.id;
+    } else {
+      // Key was deleted — create new
+      const newKey = generateApiKey();
+      const expiry = new Date();
+      expiry.setDate(expiry.getDate() + plan.durationDays);
+      const created = await prisma.apiKey.create({
+        data: {
+          name: `${plan.name} - ${order.customerName}`,
+          key: newKey, balance: 0, enabled: true, expiry,
+          rateLimitAmount: plan.rateLimitAmount,
+          rateLimitIntervalHours: plan.rateLimitIntervalHours,
+          rateLimitWindowStart: new Date(), rateLimitWindowSpent: 0,
+        },
+      });
+      finalKey = newKey;
+      keyId = created.id;
+    }
+  } else {
+    // New user — create new key
+    const newKey = generateApiKey();
+    const expiry = new Date();
+    expiry.setDate(expiry.getDate() + plan.durationDays);
+    const created = await prisma.apiKey.create({
       data: {
         name: `${plan.name} - ${order.customerName}`,
-        key: newKey,
-        balance: 0,
-        enabled: true,
-        expiry,
+        key: newKey, balance: 0, enabled: true, expiry,
         rateLimitAmount: plan.rateLimitAmount,
         rateLimitIntervalHours: plan.rateLimitIntervalHours,
-        rateLimitWindowStart: new Date(),
-        rateLimitWindowSpent: 0,
+        rateLimitWindowStart: new Date(), rateLimitWindowSpent: 0,
       },
-    }),
-    prisma.order.update({
-      where: { orderCode },
-      data: { status: 'paid', apiKeyId: undefined }, // apiKeyId set below
-    }),
-  ]);
+    });
+    finalKey = newKey;
+    keyId = created.id;
+  }
 
-  // Link order to the new key
   await prisma.order.update({
     where: { orderCode },
-    data: { status: 'paid', apiKeyId: apiKeyRecord.id },
+    data: { status: 'paid', apiKeyId: keyId },
   });
+
+  const isUpgrade = !!order.apiKeyId;
 
   // Telegram notification (fire-and-forget)
   sendTelegramNotification(
     buildOrderPaidMessage(
       orderCode,
-      plan.name,
+      plan.name + (isUpgrade ? ' (gia hạn)' : ''),
       order.amount,
       order.customerName,
       order.customerEmail,
-      newKey.substring(0, 12)
+      finalKey.substring(0, 12)
     )
   ).catch(() => {});
 
-  return { apiKey: newKey, order: { ...order, status: 'paid' } };
+  return { apiKey: finalKey, order: { ...order, status: 'paid' }, isUpgrade };
 }
 
 // ─── Success Redirect ──────────────────────────────────────────────────────
@@ -133,23 +181,30 @@ router.get('/success/:orderCode', async (req: Request, res: Response) => {
     }
 
     const plan = getPlan(result.order.planId);
+    const isUpgrade = result.isUpgrade;
     res.send(renderPage(
-      'Thanh toán thành công!',
+      isUpgrade ? 'Gia hạn thành công!' : 'Thanh toán thành công!',
       `
         <div class="success-icon">&#10003;</div>
-        <h2>Thanh toán thành công!</h2>
+        <h2>${isUpgrade ? 'Gia hạn thành công!' : 'Thanh toán thành công!'}</h2>
         <p>Đơn hàng <strong>${result.order.orderCode}</strong> đã được xác nhận.</p>
         <div class="info-card">
-          <div class="info-row"><span>Gói dịch vụ</span><strong>${plan?.name || result.order.planId}</strong></div>
+          <div class="info-row"><span>Gói dịch vụ</span><strong>${plan?.name || result.order.planId}${isUpgrade ? ' (gia hạn)' : ''}</strong></div>
           <div class="info-row"><span>Số tiền</span><strong>${result.order.amount.toLocaleString('vi-VN')}đ</strong></div>
-          <div class="info-row"><span>Thời hạn</span><strong>${plan?.durationDays || '?'} ngày</strong></div>
+          <div class="info-row"><span>Thời hạn</span><strong>+${plan?.durationDays || '?'} ngày</strong></div>
         </div>
+        ${isUpgrade ? `
+        <div class="info-card" style="border-color:var(--success);margin-top:12px;">
+          <p style="text-align:center;color:#22c55e;font-weight:600;">API Key hiện tại đã được cập nhật.<br>Không cần đổi key.</p>
+        </div>
+        ` : `
         <div class="key-box">
           <p class="key-label">API Key của bạn</p>
           <div class="key-value" id="apiKey">${result.apiKey}</div>
           <button class="copy-btn" onclick="var t=document.getElementById('apiKey').textContent,a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');document.body.removeChild(a);this.textContent='Đã copy!';var b=this;setTimeout(function(){b.textContent='Copy API Key'},2000)">Copy API Key</button>
         </div>
         <p class="warning">&#9888; Hãy lưu API key này ngay. Bạn sẽ không thể xem lại sau khi rời trang.</p>
+        `}
         <a href="/dashboard" class="btn-primary">Vào Dashboard &rarr;</a>
       `,
       true

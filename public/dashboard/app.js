@@ -409,7 +409,7 @@ async function submitUpgrade() {
         var res = await fetch('/checkout/create-order', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ plan_id: selectedUpgradePlan.id, customer_name: name, customer_email: email, customer_phone: phone }),
+            body: JSON.stringify({ plan_id: selectedUpgradePlan.id, customer_name: name, customer_email: email, customer_phone: phone, existing_api_key: state.apiKey }),
             cache: 'no-store'
         });
         var data = await res.json();
