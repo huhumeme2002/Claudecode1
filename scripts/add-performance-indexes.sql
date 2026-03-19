@@ -1,14 +1,18 @@
 -- Performance indexes for usage_logs table
 -- Run this MANUALLY on the PostgreSQL server:
 --   psql <connection_string> -f scripts/add-performance-indexes.sql
---
--- Uses a helper function marked IMMUTABLE so PostgreSQL allows expression indexes.
--- Vietnam has no DST, so UTC+7 via INTERVAL is always correct.
 
--- 1. Create IMMUTABLE helper: timestamptz → Vietnam date
+-- 1. Create IMMUTABLE helper: timestamptz → Vietnam date (UTC+7)
+-- Must use plpgsql (not sql) to prevent inlining — PostgreSQL inlines
+-- SQL functions and checks internal volatility, rejecting AT TIME ZONE.
+-- plpgsql is opaque to the planner, so it trusts our IMMUTABLE declaration.
 CREATE OR REPLACE FUNCTION vn_date(ts timestamptz) RETURNS date
-LANGUAGE sql IMMUTABLE PARALLEL SAFE
-AS $$ SELECT (ts AT TIME ZONE INTERVAL '7 hours')::date $$;
+LANGUAGE plpgsql IMMUTABLE PARALLEL SAFE
+AS $$
+BEGIN
+  RETURN (ts AT TIME ZONE INTERVAL '7 hours')::date;
+END;
+$$;
 
 -- 2. Expression index for admin dashboard: GROUP BY vn_date across all keys
 CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_usage_logs_datevn
