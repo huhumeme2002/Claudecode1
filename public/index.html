@@ -1012,7 +1012,7 @@
             <li><a href="#pricing">B&#7843;ng gi&#225;</a></li>
             <li><a href="#plans">G&#243;i d&#7883;ch v&#7909;</a></li>
             <li><a href="#guide">H&#432;&#7899;ng d&#7851;n</a></li>
-            <li><a href="#payment">Thanh to&#225;n</a></li>
+            <li><a href="#plans">Mua g&#243;i</a></li>
         </ul>
         <div class="nav-right">
             <a href="/dashboard" class="btn btn-ghost btn-sm">Dashboard</a>
@@ -1421,36 +1421,34 @@ const message = await client.messages.create({
         </div>
     </section>
 
-    <!-- Payment -->
-    <section id="payment" class="section">
-        <div class="bg-glow" style="width:600px;height:600px;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--accent);opacity:0.05;"></div>
-        <div class="container">
-            <div class="section-header reveal">
-                <div class="section-label">Payment</div>
-                <h2 class="section-title">Thanh to&#225;n</h2>
-                <p class="section-subtitle">N&#7841;p ti&#7873;n v&#224;o t&#224;i kho&#7843;n &#273;&#7875; b&#7855;t &#273;&#7847;u</p>
+    <!-- Checkout Modal -->
+    <div id="checkoutModal" style="display:none;position:fixed;inset:0;z-index:2000;align-items:center;justify-content:center;padding:20px;">
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,0.7);backdrop-filter:blur(8px);" onclick="closeCheckout()"></div>
+        <div style="position:relative;background:#111318;border:1px solid var(--border);border-radius:20px;max-width:440px;width:100%;padding:36px;box-shadow:0 30px 80px rgba(0,0,0,0.6);">
+            <button onclick="closeCheckout()" style="position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-dim);font-size:20px;cursor:pointer;padding:4px 8px;">&times;</button>
+            <div style="text-align:center;margin-bottom:24px;">
+                <h3 style="font-size:22px;font-weight:800;margin-bottom:6px;" id="modalTitle">Thanh to&#225;n</h3>
+                <p style="color:var(--accent);font-size:14px;font-weight:600;" id="modalPlan"></p>
+                <p style="color:var(--text-dim);font-size:28px;font-weight:800;margin-top:8px;" id="modalPrice"></p>
             </div>
-            <div class="payment-card reveal" id="checkoutForm" style="max-width:480px;text-align:left;">
-                <h3 style="text-align:center;margin-bottom:8px;" id="checkoutTitle">Thanh to&#225;n</h3>
-                <p style="text-align:center;color:var(--text-dim);font-size:14px;margin-bottom:24px;" id="checkoutPlan">Ch&#7885;n g&#243;i &#7903; ph&#7847;n tr&#234;n &#273;&#7875; b&#7855;t &#273;&#7847;u</p>
-                <input type="hidden" id="selectedPlan" value="">
-                <div style="margin-bottom:16px;">
-                    <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">H&#7885; t&#234;n *</label>
-                    <input type="text" id="custName" placeholder="Nguy&#7877;n V&#259;n A" style="width:100%;padding:12px 16px;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
-                </div>
-                <div style="margin-bottom:16px;">
-                    <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">Email</label>
-                    <input type="email" id="custEmail" placeholder="email@example.com" style="width:100%;padding:12px 16px;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
-                </div>
-                <div style="margin-bottom:24px;">
-                    <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">S&#7889; &#273;i&#7879;n tho&#7841;i</label>
-                    <input type="tel" id="custPhone" placeholder="0912345678" style="width:100%;padding:12px 16px;background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
-                </div>
-                <button onclick="submitCheckout()" id="checkoutBtn" class="plan-cta primary" style="border:none;cursor:pointer;font-family:inherit;" disabled>Ch&#7885;n g&#243;i &#273;&#7875; thanh to&#225;n</button>
-                <p id="checkoutError" style="color:#ef4444;font-size:13px;margin-top:12px;display:none;text-align:center;"></p>
+            <input type="hidden" id="selectedPlan" value="">
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">H&#7885; t&#234;n *</label>
+                <input type="text" id="custName" placeholder="Nguy&#7877;n V&#259;n A" style="width:100%;padding:12px 16px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
             </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">Email *</label>
+                <input type="email" id="custEmail" placeholder="email@example.com" style="width:100%;padding:12px 16px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            <div style="margin-bottom:24px;">
+                <label style="display:block;font-size:13px;color:var(--text-secondary);margin-bottom:6px;font-weight:500;">S&#7889; &#273;i&#7879;n tho&#7841;i</label>
+                <input type="tel" id="custPhone" placeholder="0912345678" style="width:100%;padding:12px 16px;background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:14px;font-family:inherit;outline:none;transition:border 0.2s;" onfocus="this.style.borderColor='var(--accent)'" onblur="this.style.borderColor='var(--border)'">
+            </div>
+            <button onclick="submitCheckout()" id="checkoutBtn" style="display:block;width:100%;padding:15px;border-radius:12px;font-size:15px;font-weight:700;text-align:center;cursor:pointer;border:none;font-family:inherit;background:var(--accent);color:#fff;box-shadow:0 4px 20px var(--accent-glow);transition:all 0.25s;">Thanh to&#225;n ngay</button>
+            <p id="checkoutError" style="color:#ef4444;font-size:13px;margin-top:12px;display:none;text-align:center;"></p>
+            <p style="text-align:center;color:var(--text-dim);font-size:12px;margin-top:16px;">&#128274; Thanh to&#225;n an to&#224;n qua Sepay</p>
         </div>
-    </section>
+    </div>
 
     <!-- Footer -->
     <footer class="footer">
@@ -1513,16 +1511,37 @@ const message = await client.messages.create({
             });
         });
 
-        // Checkout
-        const planNames = { trial:'D\u00f9ng th\u1eed (50K\u0111/ng\u00e0y)', week:'G\u00f3i Tu\u1ea7n (150K\u0111/7 ng\u00e0y)', pro:'Pro (159K\u0111/th\u00e1ng)', max5x:'Max 5x (250K\u0111/th\u00e1ng)', max20x:'Max 20x (450K\u0111/th\u00e1ng)' };
+        // Checkout modal
+        const plans = {
+            trial:  { name: 'D\u00f9ng th\u1eed', price: '50.000\u0111', period: '1 ng\u00e0y' },
+            week:   { name: 'G\u00f3i Tu\u1ea7n', price: '150.000\u0111', period: '7 ng\u00e0y' },
+            pro:    { name: 'Pro', price: '159.000\u0111', period: '1 th\u00e1ng' },
+            max5x:  { name: 'Max 5x', price: '250.000\u0111', period: '1 th\u00e1ng' },
+            max20x: { name: 'Max 20x', price: '450.000\u0111', period: '1 th\u00e1ng' }
+        };
 
         function selectPlan(planId) {
+            const p = plans[planId];
+            if (!p) return;
             document.getElementById('selectedPlan').value = planId;
-            document.getElementById('checkoutPlan').textContent = planNames[planId] || planId;
-            document.getElementById('checkoutBtn').disabled = false;
-            document.getElementById('checkoutBtn').textContent = 'Thanh to\u00e1n ' + (planNames[planId] || '');
-            document.getElementById('payment').scrollIntoView({ behavior: 'smooth' });
+            document.getElementById('modalTitle').textContent = 'Thanh to\u00e1n g\u00f3i ' + p.name;
+            document.getElementById('modalPlan').textContent = p.period;
+            document.getElementById('modalPrice').textContent = p.price;
+            document.getElementById('checkoutBtn').textContent = 'Thanh to\u00e1n ' + p.price;
+            document.getElementById('checkoutError').style.display = 'none';
+            document.getElementById('checkoutModal').style.display = 'flex';
+            document.body.style.overflow = 'hidden';
+            document.getElementById('custName').focus();
         }
+
+        function closeCheckout() {
+            document.getElementById('checkoutModal').style.display = 'none';
+            document.body.style.overflow = '';
+        }
+
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') closeCheckout();
+        });
 
         async function submitCheckout() {
             const planId = document.getElementById('selectedPlan').value;
@@ -1532,9 +1551,10 @@ const message = await client.messages.create({
             const errEl = document.getElementById('checkoutError');
             const btn = document.getElementById('checkoutBtn');
 
-            if (!planId) { errEl.style.display='block'; errEl.textContent='Vui l\u00f2ng ch\u1ecdn g\u00f3i'; return; }
             if (!name) { errEl.style.display='block'; errEl.textContent='Vui l\u00f2ng nh\u1eadp h\u1ecd t\u00ean'; return; }
+            if (!email) { errEl.style.display='block'; errEl.textContent='Vui l\u00f2ng nh\u1eadp email'; return; }
             errEl.style.display='none';
+            const origText = btn.textContent;
             btn.disabled = true;
             btn.textContent = '\u0110ang x\u1eed l\u00fd...';
 
@@ -1547,7 +1567,6 @@ const message = await client.messages.create({
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || 'L\u1ed7i');
 
-                // Auto-submit hidden form to Sepay
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.action = data.actionUrl;
@@ -1564,7 +1583,7 @@ const message = await client.messages.create({
                 errEl.style.display='block';
                 errEl.textContent = e.message || '\u0110\u00e3 x\u1ea3y ra l\u1ed7i';
                 btn.disabled = false;
-                btn.textContent = 'Thanh to\u00e1n';
+                btn.textContent = origText;
             }
         }
     </script>
