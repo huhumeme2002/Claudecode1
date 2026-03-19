@@ -23,7 +23,20 @@ const dashboardHtml = path.join(__dirname, 'public', 'dashboard', 'index.html');
 app.get('/dashboard', (_req, res) => res.sendFile(dashboardHtml));
 app.get('/dashboard/', (_req, res) => res.sendFile(dashboardHtml));
 
+// Landing page
+const landingHtml = path.join(__dirname, 'public', 'index.html');
+app.get('/', (_req, res) => res.sendFile(landingHtml));
+
 app.use(express.static(path.join(__dirname, 'public')));
+
+// Checkout routes (explicit — needs path params)
+try {
+  const checkoutRouter = require('./lib/checkout-routes');
+  app.use('/checkout', checkoutRouter.default || checkoutRouter);
+  logger.info('Checkout routes registered at /checkout');
+} catch (err) {
+  logger.warn('Checkout routes not loaded', { error: (err as Error).message });
+}
 
 // Dynamic API route loading
 function loadApiRoutes(dir: string, prefix: string = '/api'): void {

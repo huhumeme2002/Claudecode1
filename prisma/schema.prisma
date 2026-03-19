@@ -23,8 +23,51 @@ model ApiKey {
   createdAt              DateTime   @default(now()) @map("created_at")
   updatedAt              DateTime   @updatedAt @map("updated_at")
   usageLogs              UsageLog[]
+  orders                 Order[]
 
   @@map("api_keys")
+}
+
+model Order {
+  id              String              @id @default(uuid())
+  orderCode       String              @unique @map("order_code")
+  planId          String              @map("plan_id")
+  amount          Int
+  customerName    String              @map("customer_name")
+  customerEmail   String?             @map("customer_email")
+  customerPhone   String?             @map("customer_phone")
+  apiKeyId        String?             @map("api_key_id")
+  apiKey          ApiKey?             @relation(fields: [apiKeyId], references: [id])
+  paymentMethod   String              @default("manual") @map("payment_method")
+  status          String              @default("pending")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+  sepayTransactions SepayTransaction[]
+
+  @@index([orderCode])
+  @@index([status])
+  @@map("orders")
+}
+
+model SepayTransaction {
+  id              String   @id @default(uuid())
+  sepayId         Int      @unique @map("sepay_id")
+  gateway         String   @default("")
+  transactionDate String   @default("") @map("transaction_date")
+  accountNumber   String   @default("") @map("account_number")
+  transferType    String   @default("") @map("transfer_type")
+  transferAmount  Int      @default(0) @map("transfer_amount")
+  accumulated     Int      @default(0)
+  code            String   @default("")
+  content         String   @default("")
+  referenceNumber String   @default("") @map("reference_number")
+  description     String   @default("")
+  orderId         String?  @map("order_id")
+  order           Order?   @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  processed       Boolean  @default(false)
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("sepay_transactions")
 }
 
 model ModelMapping {
