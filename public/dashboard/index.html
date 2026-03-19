@@ -566,6 +566,173 @@
             color: var(--text-dim);
             font-size: 14px;
         }
+        /* Tabs */
+        .dash-tabs {
+            display: flex;
+            gap: 4px;
+            padding: 0 32px;
+            background: rgba(19, 21, 29, 0.5);
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 65px;
+            z-index: 90;
+            backdrop-filter: blur(10px);
+        }
+        .dash-tab {
+            padding: 12px 20px;
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text-dim);
+            cursor: pointer;
+            border: none;
+            background: none;
+            border-bottom: 2px solid transparent;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+        .dash-tab:hover { color: var(--text); }
+        .dash-tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        /* Guide */
+        .guide-card {
+            background: rgba(19, 21, 29, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 28px;
+            margin-bottom: 20px;
+        }
+        .guide-card h3 {
+            font-size: 17px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .guide-card p, .guide-card li {
+            color: var(--text-dim);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+        .guide-card ul { padding-left: 20px; margin: 8px 0; }
+        .guide-card li { margin-bottom: 6px; }
+        .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 28px;
+            height: 28px;
+            background: var(--gradient-1);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 13px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+        .guide-code {
+            background: rgba(10, 11, 15, 0.8);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 14px 18px;
+            font-family: 'Consolas', monospace;
+            font-size: 13px;
+            color: var(--text);
+            margin: 10px 0;
+            overflow-x: auto;
+            position: relative;
+        }
+        .guide-code .cp-btn {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid var(--border);
+            color: var(--text-dim);
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+        }
+        .guide-code .cp-btn:hover { color: var(--accent); border-color: var(--accent); }
+        .guide-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 12px 0;
+        }
+        .guide-table th, .guide-table td {
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            font-size: 13px;
+            text-align: left;
+        }
+        .guide-table th {
+            background: rgba(0, 0, 0, 0.3);
+            color: var(--text-dim);
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+        }
+        .guide-table td { color: var(--text); }
+        .guide-table code {
+            background: rgba(99,102,241,0.1);
+            color: var(--accent);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+        .guide-warn {
+            background: rgba(245, 158, 11, 0.1);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: #fbbf24;
+            font-size: 13px;
+            margin: 12px 0;
+        }
+        /* Upgrade */
+        .upgrade-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+        .upgrade-card {
+            background: rgba(19, 21, 29, 0.6);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        .upgrade-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.3);
+        }
+        .upgrade-card.current {
+            border-color: var(--success);
+            opacity: 0.6;
+            cursor: default;
+        }
+        .upgrade-card.current:hover { transform: none; box-shadow: none; }
+        .upgrade-card-name { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+        .upgrade-card-price { font-size: 24px; font-weight: 800; margin-bottom: 4px; }
+        .upgrade-card-detail { font-size: 12px; color: var(--text-dim); }
+        .upgrade-card-badge {
+            display: inline-block;
+            font-size: 11px;
+            padding: 3px 10px;
+            border-radius: 100px;
+            margin-top: 10px;
+            font-weight: 600;
+        }
         @media (max-width: 768px) {
             .topbar {
                 flex-direction: column;
@@ -624,76 +791,131 @@
             </div>
         </header>
 
+        <!-- Tabs -->
+        <div class="dash-tabs">
+            <button class="dash-tab active" onclick="switchDashTab('overview')">Tổng quan</button>
+            <button class="dash-tab" onclick="switchDashTab('guide')">Hướng dẫn</button>
+            <button class="dash-tab" onclick="switchDashTab('upgrade')">Gia hạn / Nâng cấp</button>
+        </div>
+
         <main class="container">
             <div id="dashAlert" class="alert"></div>
 
-            <!-- Stats Cards -->
-            <div class="cards" id="statsCards"></div>
-
-            <!-- Plan Info -->
-            <div class="section" id="planSection"></div>
-
-            <!-- Chart -->
-            <div class="section">
-                <div class="section-header">
-                    <h3>Chi tiêu theo ngày</h3>
-                    <select id="chartDays" onchange="loadChart()">
-                        <option value="7">7 ngày</option>
-                        <option value="14">14 ngày</option>
-                        <option value="30" selected>30 ngày</option>
-                    </select>
+            <!-- TAB: Overview -->
+            <div id="tab-overview" class="tab-content active">
+                <div class="cards" id="statsCards"></div>
+                <div class="section" id="planSection"></div>
+                <div class="section">
+                    <div class="section-header">
+                        <h3>Chi tiêu theo ngày</h3>
+                        <select id="chartDays" onchange="loadChart()">
+                            <option value="7">7 ngày</option>
+                            <option value="14">14 ngày</option>
+                            <option value="30" selected>30 ngày</option>
+                        </select>
+                    </div>
+                    <div class="chart-wrap" id="chartWrap"></div>
                 </div>
-                <div class="chart-wrap" id="chartWrap"></div>
-            </div>
-
-            <!-- Usage by Model -->
-            <div class="section">
-                <div class="section-header">
-                    <h3>Thống kê theo Model</h3>
-                    <select id="summaryDays" onchange="loadSummary()">
-                        <option value="0" selected>Tất cả</option>
-                        <option value="7">7 ngày</option>
-                        <option value="30">30 ngày</option>
-                        <option value="90">90 ngày</option>
-                    </select>
+                <div class="section">
+                    <div class="section-header">
+                        <h3>Thống kê theo Model</h3>
+                        <select id="summaryDays" onchange="loadSummary()">
+                            <option value="0" selected>Tất cả</option>
+                            <option value="7">7 ngày</option>
+                            <option value="30">30 ngày</option>
+                            <option value="90">90 ngày</option>
+                        </select>
+                    </div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Model</th><th>Requests</th><th>Input Tokens</th><th>Output Tokens</th><th>Chi phí</th></tr></thead>
+                            <tbody id="summaryTable"></tbody>
+                            <tfoot id="summaryTotals"></tfoot>
+                        </table>
+                    </div>
                 </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Model</th>
-                                <th>Requests</th>
-                                <th>Input Tokens</th>
-                                <th>Output Tokens</th>
-                                <th>Chi phí</th>
-                            </tr>
-                        </thead>
-                        <tbody id="summaryTable"></tbody>
-                        <tfoot id="summaryTotals"></tfoot>
-                    </table>
+                <div class="section">
+                    <div class="section-header"><h3>Lịch sử gần đây</h3></div>
+                    <div class="table-wrap">
+                        <table>
+                            <thead><tr><th>Thời gian</th><th>Model</th><th>Input</th><th>Output</th><th>Chi phí</th></tr></thead>
+                            <tbody id="recentTable"></tbody>
+                        </table>
+                    </div>
+                    <div class="pagination" id="pagination"></div>
                 </div>
             </div>
 
-            <!-- Recent Logs -->
-            <div class="section">
-                <div class="section-header">
-                    <h3>Lịch sử gần đây</h3>
+            <!-- TAB: Guide -->
+            <div id="tab-guide" class="tab-content">
+                <div class="guide-card">
+                    <h3>Hướng dẫn chung</h3>
+                    <p>API proxy tương thích hoàn toàn với Anthropic SDK. Bạn chỉ cần thay <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">base_url</code> trỏ về <strong>http://pro-x.io.vn</strong> và sử dụng API key được cấp.</p>
+                    <p style="margin-top:8px;">Model hỗ trợ: <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">claude-opus-4-6</code>, <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">claude-sonnet-4-6</code>, <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">claude-haiku-4-5-20251001</code></p>
                 </div>
-                <div class="table-wrap">
-                    <table>
-                        <thead>
-                            <tr>
-                                <th>Thời gian</th>
-                                <th>Model</th>
-                                <th>Input</th>
-                                <th>Output</th>
-                                <th>Chi phí</th>
-                            </tr>
-                        </thead>
-                        <tbody id="recentTable"></tbody>
+
+                <div class="guide-card">
+                    <h3><span class="step-num">1</span> Cài đặt OpenClaw</h3>
+                    <p>Yêu cầu: <strong>Node.js v22.12+</strong> — Tải tại <a href="https://nodejs.org" target="_blank" style="color:var(--accent);">nodejs.org</a> (chọn bản v22.x LTS)</p>
+                    <div class="guide-code">node -v<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+                    <p style="margin-top:12px;">Cài OpenClaw:</p>
+                    <div class="guide-code">npm install -g openclaw@latest<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span class="step-num">2</span> Chạy Onboard</h3>
+                    <div class="guide-code">openclaw onboard --install-daemon<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span class="step-num">3</span> Chọn cấu hình khi wizard hỏi</h3>
+                    <table class="guide-table">
+                        <thead><tr><th>Câu hỏi</th><th>Chọn / Nhập</th></tr></thead>
+                        <tbody>
+                            <tr><td>Model/auth provider</td><td><strong>Custom Provider</strong></td></tr>
+                            <tr><td>API Base URL</td><td><code>http://pro-x.io.vn</code></td></tr>
+                            <tr><td>How do you want to provide this API key?</td><td><strong>Paste API key now</strong></td></tr>
+                            <tr><td>API Key</td><td>Paste key của bạn (<span id="guideKeyPreview" style="color:var(--accent);">chưa đăng nhập</span>)</td></tr>
+                            <tr><td>Endpoint compatibility</td><td><strong>Anthropic-compatible</strong></td></tr>
+                            <tr><td>Model ID</td><td><code>claude-sonnet-4-6</code></td></tr>
+                        </tbody>
                     </table>
+                    <div class="guide-warn">&#9888; Lưu ý: KHÔNG thêm <code>/v1</code> vào cuối API Base URL</div>
                 </div>
-                <div class="pagination" id="pagination"></div>
+
+                <div class="guide-card">
+                    <h3><span class="step-num">4</span> Sửa Context Window <span style="color:var(--danger);font-size:13px;">(Quan trọng!)</span></h3>
+                    <p>Sau khi onboard xong, <strong>bắt buộc</strong> phải sửa 2 file:</p>
+
+                    <p style="margin-top:14px;font-weight:600;color:var(--text);">File 1: models.json</p>
+                    <p style="font-size:12px;color:var(--text-dim);">Windows: <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:12px;">%USERPROFILE%\.openclaw\agents\main\agent\models.json</code></p>
+                    <p style="font-size:12px;color:var(--text-dim);">macOS/Linux: <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:12px;">~/.openclaw/agents/main/agent/models.json</code></p>
+
+                    <p style="margin-top:14px;font-weight:600;color:var(--text);">File 2: openclaw.json</p>
+                    <p style="font-size:12px;color:var(--text-dim);">Windows: <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:12px;">%USERPROFILE%\.openclaw\openclaw.json</code></p>
+                    <p style="font-size:12px;color:var(--text-dim);">macOS/Linux: <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:12px;">~/.openclaw/openclaw.json</code></p>
+
+                    <p style="margin-top:12px;">Tìm và sửa thành:</p>
+                    <div class="guide-code">"contextWindow": 200000,
+"maxTokens": 8192<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+                    <div class="guide-warn">&#9888; Phải sửa cả 2 file. Mặc định wizard để 16000/4096 — quá thấp, sẽ gây lỗi compaction loop.</div>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span class="step-num">5</span> Khởi động OpenClaw</h3>
+                    <div class="guide-code">openclaw gateway<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+                    <p>Nếu terminal hiển thị gateway khởi động thành công, bạn đã sẵn sàng sử dụng!</p>
+                    <p style="margin-top:8px;color:var(--text-dim);font-size:13px;">Nếu gặp lỗi, hãy liên hệ admin để được hỗ trợ.</p>
+                </div>
+            </div>
+
+            <!-- TAB: Upgrade -->
+            <div id="tab-upgrade" class="tab-content">
+                <div class="guide-card">
+                    <h3>Gia hạn / Nâng cấp gói</h3>
+                    <p>Chọn gói bạn muốn mua hoặc nâng cấp. Nếu gói hiện tại còn thời hạn, thời gian sẽ được <strong>cộng thêm</strong> vào key hiện tại.</p>
+                </div>
+                <div class="upgrade-grid" id="upgradeGrid"></div>
             </div>
         </main>
     </div>

@@ -1513,6 +1513,13 @@ const message = await client.messages.create({
             });
         });
 
+        // Auto-open checkout from ?upgrade= param
+        const urlParams = new URLSearchParams(window.location.search);
+        const upgradePlan = urlParams.get('upgrade');
+        if (upgradePlan && plans[upgradePlan]) {
+            setTimeout(() => selectPlan(upgradePlan), 500);
+        }
+
         // Checkout modal
         const plans = {
             trial:  { name: 'D\u00f9ng th\u1eed', price: '50.000\u0111', period: '1 ng\u00e0y' },

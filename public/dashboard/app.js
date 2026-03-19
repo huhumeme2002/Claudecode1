@@ -316,6 +316,66 @@ function renderRecent(logs, pg) {
     pagEl.innerHTML = btns;
 }
 
+// Tab switching
+function switchDashTab(tab) {
+    document.querySelectorAll('.dash-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + tab).classList.add('active');
+    document.querySelector(`.dash-tab[onclick*="${tab}"]`).classList.add('active');
+    if (tab === 'guide') updateGuideKey();
+    if (tab === 'upgrade') renderUpgradeGrid();
+}
+
+// Guide copy
+function gcopy(btn) {
+    var code = btn.parentElement.textContent.replace('Copy','').replace('Đã copy!','').trim();
+    var ta = document.createElement('textarea');
+    ta.value = code;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    btn.textContent = 'Đã copy!';
+    setTimeout(function(){ btn.textContent = 'Copy'; }, 2000);
+}
+
+function updateGuideKey() {
+    var el = document.getElementById('guideKeyPreview');
+    if (el && state.apiKey) {
+        el.textContent = state.apiKey.substring(0, 10) + '...';
+    }
+}
+
+// Upgrade / Renew
+const upgradePlans = [
+    { id: 'trial', name: 'Dùng thử', price: 50000, priceLabel: '50.000đ', detail: '20 credit/5h • 1 ngày', credit: 20 },
+    { id: 'week', name: 'Gói Tuần', price: 150000, priceLabel: '150.000đ', detail: '50 credit/5h • 7 ngày', credit: 50 },
+    { id: 'pro', name: 'Pro', price: 159000, priceLabel: '159.000đ', detail: '20 credit/5h • 1 tháng', credit: 20 },
+    { id: 'max5x', name: 'Max 5x', price: 250000, priceLabel: '250.000đ', detail: '50 credit/5h • 1 tháng', credit: 50 },
+    { id: 'max20x', name: 'Max 20x', price: 450000, priceLabel: '450.000đ', detail: '100 credit/5h • 1 tháng', credit: 100 },
+];
+
+function renderUpgradeGrid() {
+    var grid = document.getElementById('upgradeGrid');
+    if (!grid) return;
+    var currentCredit = state.status ? state.status.rate_limit_amount : 0;
+    grid.innerHTML = upgradePlans.map(function(p) {
+        var isCurrent = currentCredit === p.credit && state.status && !state.status.expired;
+        return '<div class="upgrade-card' + (isCurrent ? ' current' : '') + '" ' +
+            (isCurrent ? '' : 'onclick="startUpgrade(\'' + p.id + '\')"') + '>' +
+            '<div class="upgrade-card-name">' + p.name + '</div>' +
+            '<div class="upgrade-card-price">' + p.priceLabel + '</div>' +
+            '<div class="upgrade-card-detail">' + p.detail + '</div>' +
+            (isCurrent ? '<div class="upgrade-card-badge" style="background:rgba(16,185,129,0.15);color:#10b981;">Gói hiện tại</div>' : '<div class="upgrade-card-badge" style="background:rgba(99,102,241,0.1);color:var(--accent);">Chọn gói này</div>') +
+            '</div>';
+    }).join('');
+}
+
+function startUpgrade(planId) {
+    // Redirect to landing page checkout with plan pre-selected
+    window.location.href = '/?upgrade=' + planId + '#plans';
+}
+
 // Init
 document.addEventListener('DOMContentLoaded', () => {
     if (state.apiKey) {
