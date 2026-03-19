@@ -7,7 +7,7 @@ const router = Router();
 
 // Cache dashboard stats for 2 minutes — admin doesn't need real-time
 let dashboardCache: { data: any; timestamp: number } | null = null;
-const CACHE_TTL_MS = 120_000; // 2 minutes
+const CACHE_TTL_MS = 300_000; // 5 minutes
 
 router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {

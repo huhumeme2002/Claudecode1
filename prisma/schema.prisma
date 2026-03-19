@@ -61,6 +61,7 @@ model UsageLog {
 
   @@index([createdAt])
   @@index([apiKeyId, createdAt])
+  @@index([apiKeyId, modelId])
   @@map("usage_logs")
 }
 

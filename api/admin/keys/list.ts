@@ -7,7 +7,7 @@ const router = Router();
 
 // Cache key list for 5 seconds — admin doesn't need real-time data on F5
 let keysCache: { data: any; timestamp: number } | null = null;
-const CACHE_TTL_MS = 5_000;
+const CACHE_TTL_MS = 30_000;
 
 router.get('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) => {
   try {

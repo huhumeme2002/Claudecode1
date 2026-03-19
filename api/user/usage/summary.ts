@@ -6,7 +6,7 @@ import { LRUCache } from 'lru-cache';
 
 const router = Router();
 
-const summaryCache = new LRUCache<string, any>({ max: 500, ttl: 60_000 });
+const summaryCache = new LRUCache<string, any>({ max: 500, ttl: 300_000 });
 
 router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) => {
   try {

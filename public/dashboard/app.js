@@ -71,13 +71,19 @@ function showApp() {
     document.getElementById('loginPage').classList.add('hidden');
     document.getElementById('mainApp').classList.remove('hidden');
     loadAll();
-    // Auto-refresh mỗi 30 giây
+    // Auto-refresh mỗi 2 phút (giảm tải DB)
     if (state.refreshInterval) clearInterval(state.refreshInterval);
-    state.refreshInterval = setInterval(() => loadAll(), 30000);
+    state.refreshInterval = setInterval(() => loadAll(), 120000);
 }
 
 async function loadAll() {
-    await Promise.all([loadStatus(), loadChart(), loadSummary(), loadRecent()]);
+    // Load status first (fast, no heavy DB query)
+    await loadStatus();
+    // Stagger heavy queries to avoid DB connection stampede
+    // Each query can saturate the connection pool — spreading them reduces peak load
+    setTimeout(loadRecent, 50);
+    setTimeout(loadChart, 150);
+    setTimeout(loadSummary, 300);
 }
 
 // Status

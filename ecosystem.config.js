@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'billing-proxy',
       script: './dist/server.js',
-      instances: 5,
+      instances: 3,
       exec_mode: 'cluster',
       env: {
         NODE_ENV: 'production'

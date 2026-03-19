@@ -52,8 +52,8 @@ Required in `.env`:
 
 ```
 Client → Express → Auth (API key) → Expiry + Budget check → Model Mapping lookup →
-System prompt injection → Swap model name → Upstream API → Parse token usage →
-Calculate cost → Deduct balance (Prisma transaction) → Return response
+System prompt injection → Swap model name → Upstream API (600s timeout) → Parse token usage →
+Calculate cost → Queue billing entry (fire-and-forget) → Sanitize response → Return response
 ```
 
 ### Two Billing Modes
@@ -83,8 +83,8 @@ Both servers use the same dynamic route loader (skipping `proxy.js`). Add `ADMIN
 - `api/proxy.ts` — Core proxy with multi-provider routing, streaming SSE forwarding, and token extraction
 - `lib/token-parser.ts` — Extracts token counts from both OpenAI and Anthropic response formats (stream and non-stream). `StreamTokenParser` buffers SSE chunks and parses on `\n\n` boundaries.
 - `lib/billing.ts` — Cost calculation (`$/million tokens`), budget checking, and batch billing queue (see below)
-- `lib/cache.ts` — LRU cache for model mappings and settings; call `clearModelCache()` / `clearSettingsCache()` / `clearAllCaches()` on any admin update
-- `lib/auth.ts` — `verifyAdmin` middleware (JWT) and `verifyApiKey` middleware (API key lookup). Both read `Authorization: Bearer <token>` header.
+- `lib/cache.ts` — LRU cache for model mappings (60s TTL) and settings (60s TTL); call `clearModelCache()` / `clearSettingsCache()` on any admin update
+- `lib/auth.ts` — `verifyAdmin` middleware (JWT via `Authorization: Bearer`) and `verifyApiKey` middleware (supports both `Authorization: Bearer` and `x-api-key` headers, prioritizing `x-api-key`). API key lookups are cached (LRU, 30s TTL) with negative caching for invalid keys. Budget fields (balance, rate window) are re-fetched from DB at most once per 5s per key. Call `invalidateApiKeyCache(key?)` after key updates.
 - `lib/logger.ts` — Winston logger singleton. Level: `debug` in dev, `info` in prod. Import as `import logger from './lib/logger'`. Also exports `correlationId()`.
 - `lib/db.ts` — Prisma client singleton (never instantiate per-request)
 - `lib/types.ts` — Shared TypeScript interfaces (`AuthenticatedRequest`, `TokenUsage`, `UsageLogEntry`, etc.)
@@ -125,6 +125,22 @@ The proxy checks for `ANTHROPIC_MAGIC_STRING_TRIGGER_REFUSAL_*` in message conte
 
 - **OpenAI**: `usage.prompt_tokens` / `usage.completion_tokens` (stream: final chunk; non-stream: response body)
 - **Anthropic**: `message.usage.input_tokens` (message_start event) / `usage.output_tokens` (message_delta event)
+
+### Error Response Format
+
+All errors (auth, validation, upstream, internal) use Anthropic-compatible JSON:
+```json
+{ "type": "error", "error": { "type": "<error_type>", "message": "<message>" } }
+```
+Error types: `authentication_error`, `invalid_request_error`, `not_found_error`, `rate_limit_error`, `overloaded_error`, `api_error`. Upstream errors are never forwarded raw — they are mapped to this format with sanitized messages.
+
+### Response Identity
+
+The proxy generates its own response IDs to replace upstream IDs: Anthropic format uses `msg_01` + 20 random chars, OpenAI format uses `chatcmpl-<uuid>`. This is part of the provider identity sanitization.
+
+### Body Size Limits
+
+Main server (`server.ts`): 50mb JSON body limit. Admin server (`server-admin.ts`): 10mb limit.
 
 ## Testing
 

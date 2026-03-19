@@ -6,7 +6,10 @@ import { LRUCache } from 'lru-cache';
 
 const router = Router();
 
-const recentCache = new LRUCache<string, any>({ max: 500, ttl: 30_000 });
+// Response cache: 60s per page
+const recentCache = new LRUCache<string, any>({ max: 500, ttl: 60_000 });
+// Count cache: 5 min — COUNT(*) is expensive on large tables, total changes slowly
+const countCache = new LRUCache<string, number>({ max: 500, ttl: 300_000 });
 
 router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -20,6 +23,10 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
     if (cached) { res.json(cached); return; }
 
     const skip = (page - 1) * limit;
+
+    // Use cached count to avoid expensive COUNT(*) on every request
+    const cachedTotal = countCache.get(req.apiKey.id);
+
     const [logs, total] = await Promise.all([
       prisma.usageLog.findMany({
         where: { apiKeyId: req.apiKey.id },
@@ -28,8 +35,14 @@ router.get('/', verifyApiKey, async (req: AuthenticatedRequest, res: Response) =
         skip,
         take: limit,
       }),
-      prisma.usageLog.count({ where: { apiKeyId: req.apiKey.id } }),
+      cachedTotal !== undefined
+        ? Promise.resolve(cachedTotal)
+        : prisma.usageLog.count({ where: { apiKeyId: req.apiKey.id } }),
     ]);
+
+    if (cachedTotal === undefined) {
+      countCache.set(req.apiKey.id, total);
+    }
 
     const data = {
       logs: logs.map(l => ({
