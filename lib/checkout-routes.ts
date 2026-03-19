@@ -147,7 +147,7 @@ router.get('/success/:orderCode', async (req: Request, res: Response) => {
         <div class="key-box">
           <p class="key-label">API Key của bạn</p>
           <div class="key-value" id="apiKey">${result.apiKey}</div>
-          <button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById('apiKey').textContent).then(()=>{this.textContent='Đã copy!'});setTimeout(()=>{this.textContent='Copy API Key'},2000)">Copy API Key</button>
+          <button class="copy-btn" onclick="var t=document.getElementById('apiKey').textContent,a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');document.body.removeChild(a);this.textContent='Đã copy!';var b=this;setTimeout(function(){b.textContent='Copy API Key'},2000)">Copy API Key</button>
         </div>
         <p class="warning">&#9888; Hãy lưu API key này ngay. Bạn sẽ không thể xem lại sau khi rời trang.</p>
         <a href="/dashboard" class="btn-primary">Vào Dashboard &rarr;</a>
