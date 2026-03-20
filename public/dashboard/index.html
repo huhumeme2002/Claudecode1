@@ -794,7 +794,8 @@
         <!-- Tabs -->
         <div class="dash-tabs">
             <button class="dash-tab active" onclick="switchDashTab('overview')">Tổng quan</button>
-            <button class="dash-tab" onclick="switchDashTab('guide')">Hướng dẫn</button>
+            <button class="dash-tab" onclick="switchDashTab('guide-claude')">Claude Code</button>
+            <button class="dash-tab" onclick="switchDashTab('guide-openclaw')">OpenClaw</button>
             <button class="dash-tab" onclick="switchDashTab('upgrade')">Gia hạn / Nâng cấp</button>
         </div>
 
@@ -846,11 +847,98 @@
                 </div>
             </div>
 
-            <!-- TAB: Guide -->
-            <div id="tab-guide" class="tab-content">
+            <!-- TAB: Claude Code Guide -->
+            <div id="tab-guide-claude" class="tab-content">
                 <div class="guide-card">
-                    <h3>Hướng dẫn chung</h3>
-                    <p>API proxy tương thích hoàn toàn với Anthropic SDK. Bạn chỉ cần thay <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">base_url</code> trỏ về <strong>http://pro-x.io.vn</strong> và sử dụng API key được cấp.</p>
+                    <h3>Hướng dẫn cài đặt Claude Code</h3>
+                    <p>Kết nối Claude Code với API proxy chỉ với vài bước đơn giản.</p>
+                    <p style="margin-top:8px;">Model hỗ trợ: <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">claude-opus-4-6</code>, <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">claude-sonnet-4-6</code>, <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">claude-haiku-4-5-20251001</code></p>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span class="step-num">1</span> Tải các thư viện cần thiết</h3>
+                    <p><strong>Cài đặt Node.js</strong> — Tải tại <a href="https://nodejs.org" target="_blank" style="color:var(--accent);">nodejs.org</a> (chọn bản v22.x LTS)</p>
+                    <div class="guide-code">node -v<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+
+                    <p style="margin-top:16px;"><strong>Cài đặt Bun</strong></p>
+                    <p style="margin-top:6px;font-size:13px;color:var(--text-dim);">macOS / Linux:</p>
+                    <div class="guide-code">curl -fsSL https://bun.sh/install | bash<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+                    <p style="margin-top:6px;font-size:13px;color:var(--text-dim);">Windows:</p>
+                    <div class="guide-code">powershell -c "irm bun.sh/install.ps1 | iex"<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span class="step-num">2</span> Chạy lệnh cài đặt</h3>
+                    <p>Mở terminal và chạy lệnh sau:</p>
+                    <div class="guide-code">bunx prox-claude-installer@latest<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+                    <p style="margin-top:8px;color:var(--text-dim);font-size:13px;">Installer sẽ tự động cấu hình Claude Code với API proxy.</p>
+                </div>
+
+                <div class="guide-card">
+                    <h3><span class="step-num">3</span> Sử dụng API trực tiếp</h3>
+                    <p>Tương thích hoàn toàn với Anthropic SDK. Chỉ cần thay <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">base_url</code> trỏ về <strong>http://pro-x.io.vn</strong></p>
+
+                    <p style="margin-top:14px;font-weight:600;color:var(--text);">Python</p>
+                    <div class="guide-code" style="white-space:pre;font-size:12px;">import anthropic
+
+client = anthropic.Anthropic(
+    api_key="<span id="guideKeyPython" style="color:var(--accent);">sk-your-api-key</span>",
+    base_url="http://pro-x.io.vn"
+)
+
+message = client.messages.create(
+    model="claude-sonnet-4-6",
+    max_tokens=1024,
+    messages=[
+        {"role": "user", "content": "Xin chào!"}
+    ]
+)<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+
+                    <p style="margin-top:14px;font-weight:600;color:var(--text);">Node.js</p>
+                    <div class="guide-code" style="white-space:pre;font-size:12px;">import Anthropic from "@anthropic-ai/sdk";
+
+const client = new Anthropic({
+    apiKey: "<span id="guideKeyNode" style="color:var(--accent);">sk-your-api-key</span>",
+    baseURL: "http://pro-x.io.vn",
+});
+
+const message = await client.messages.create({
+    model: "claude-sonnet-4-6",
+    max_tokens: 1024,
+    messages: [
+        { role: "user", content: "Xin chào!" }
+    ],
+});<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+
+                    <p style="margin-top:14px;font-weight:600;color:var(--text);">cURL</p>
+                    <div class="guide-code" style="white-space:pre;font-size:12px;">curl http://pro-x.io.vn/v1/messages \
+  -H "Content-Type: application/json" \
+  -H "x-api-key: <span id="guideKeyCurl" style="color:var(--accent);">sk-your-api-key</span>" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{
+    "model": "claude-sonnet-4-6",
+    "max_tokens": 1024,
+    "messages": [
+      {"role": "user", "content": "Xin chào!"}
+    ]
+  }'<button class="cp-btn" onclick="gcopy(this)">Copy</button></div>
+                </div>
+
+                <div class="guide-card" style="border-color:var(--warning);background:rgba(245,158,11,0.05);">
+                    <h3 style="color:var(--warning);">Lưu ý quan trọng</h3>
+                    <ul style="margin-top:8px;padding-left:20px;color:var(--text-dim);font-size:14px;">
+                        <li>Base URL: <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;">http://pro-x.io.vn</code> — <strong>KHÔNG</strong> thêm <code>/v1</code> khi dùng SDK</li>
+                        <li style="margin-top:4px;">Khi dùng cURL, endpoint đầy đủ là <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;">http://pro-x.io.vn/v1/messages</code></li>
+                        <li style="margin-top:4px;">API key có thể dùng qua header <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;">x-api-key</code> hoặc <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;">Authorization: Bearer</code></li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- TAB: OpenClaw Guide -->
+            <div id="tab-guide-openclaw" class="tab-content">
+                <div class="guide-card">
+                    <h3>Hướng dẫn cài đặt OpenClaw</h3>
+                    <p>Kết nối OpenClaw với API proxy để sử dụng Claude trong terminal.</p>
                     <p style="margin-top:8px;">Model hỗ trợ: <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">claude-opus-4-6</code>, <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">claude-sonnet-4-6</code>, <code style="color:var(--accent);background:rgba(99,102,241,0.1);padding:2px 6px;border-radius:4px;font-size:13px;">claude-haiku-4-5-20251001</code></p>
                 </div>
 

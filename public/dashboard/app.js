@@ -322,7 +322,8 @@ function switchDashTab(tab) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-' + tab).classList.add('active');
     document.querySelector(`.dash-tab[onclick*="${tab}"]`).classList.add('active');
-    if (tab === 'guide') updateGuideKey();
+    if (tab === 'guide-claude') updateGuideKey();
+    if (tab === 'guide-openclaw') updateGuideKey();
     if (tab === 'upgrade') renderUpgradeGrid();
 }
 
@@ -340,10 +341,16 @@ function gcopy(btn) {
 }
 
 function updateGuideKey() {
-    var el = document.getElementById('guideKeyPreview');
-    if (el && state.apiKey) {
-        el.textContent = state.apiKey.substring(0, 10) + '...';
+    var preview = document.getElementById('guideKeyPreview');
+    if (preview && state.apiKey) {
+        preview.textContent = state.apiKey.substring(0, 10) + '...';
     }
+    // Update code examples with actual API key
+    var keySlots = ['guideKeyPython', 'guideKeyNode', 'guideKeyCurl'];
+    keySlots.forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el && state.apiKey) el.textContent = state.apiKey;
+    });
 }
 
 // Upgrade / Renew
