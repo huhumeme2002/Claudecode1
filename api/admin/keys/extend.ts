@@ -30,7 +30,7 @@ router.post('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =
     newExpiry.setDate(newExpiry.getDate() + duration_days);
 
     await prisma.apiKey.update({
-      where: { id: key_id },
+      where: { id: key.id },
       data: { expiry: newExpiry },
     });
 
@@ -39,7 +39,7 @@ router.post('/', verifyAdmin, async (req: AuthenticatedRequest, res: Response) =
     res.json({
       success: true,
       data: {
-        key_id,
+        key_id: key.id,
         old_expiry: key.expiry,
         new_expiry: newExpiry,
         days_added: duration_days,
