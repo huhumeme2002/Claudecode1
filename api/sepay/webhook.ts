@@ -200,19 +200,30 @@ async function autoCreateKeyByAmount(
     },
   });
 
-  // Send Telegram notification with full key
+  // Send key to dedicated Telegram group
   const amountStr = amount.toLocaleString('vi-VN');
   const expiryStr = expiry.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
-  sendTelegramNotification(
-    `🔑 <b>Auto Key Created</b>\n` +
-    `\n` +
-    `Gói: <b>${plan.name}</b> ($${plan.rateLimitAmount}/${plan.rateLimitIntervalHours}h)\n` +
-    `Số tiền: <b>${amountStr}đ</b>\n` +
-    `KH: ${customerName}\n` +
-    `Hết hạn: ${expiryStr}\n` +
-    `\n` +
-    `API Key:\n<code>${newKey}</code>`
-  ).catch(() => {});
+  const keyGroupId = process.env.TELEGRAM_KEY_GROUP_ID || '';
+  const botToken = process.env.TELEGRAM_BOT_TOKEN || '';
+  if (keyGroupId && botToken) {
+    fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: keyGroupId,
+        text:
+          `🔑 <b>Key tự động</b>\n` +
+          `\n` +
+          `Gói: <b>${plan.name}</b> ($${plan.rateLimitAmount}/${plan.rateLimitIntervalHours}h)\n` +
+          `Số tiền: <b>${amountStr}đ</b>\n` +
+          `KH: ${customerName}\n` +
+          `Hết hạn: ${expiryStr}\n` +
+          `\n` +
+          `API Key:\n<code>${newKey}</code>`,
+        parse_mode: 'HTML',
+      }),
+    }).catch(() => {});
+  }
 
   return { planId: matched.planId, key: newKey };
 }
