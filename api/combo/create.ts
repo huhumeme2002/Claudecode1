@@ -4,22 +4,22 @@ import logger from '../../lib/logger';
 
 const router = Router();
 
-const COMBO_PRICES: Record<string, { minAmount: number; label: string }> = {
-  '7':  { minAmount: 120000, label: 'Combo 7 ngày' },
-  '30': { minAmount: 300000, label: 'Combo 30 ngày' },
-};
-
 /**
  * POST /api/combo/create
  *
- * Body: { duration: "7" | "30", provision_secret: string }
+ * Verify a Sepay transaction by matching reference_number or content.
+ * User must paste their transfer details so the bot can extract a reference.
  *
- * Finds an unused sepay transaction with sufficient amount,
- * marks it as processed, and returns OK for the bot to create the combo key.
+ * Body: {
+ *   reference: string,      // reference number or content snippet to match
+ *   min_amount: number,      // minimum required amount
+ * }
+ *
+ * Returns the matched transaction if valid and unprocessed.
  */
 router.post('/', async (req: Request, res: Response) => {
   try {
-    // Auth — reuse PROVISION_SECRET
+    // Auth
     const secret = process.env.PROVISION_SECRET;
     if (!secret) {
       res.status(500).json({ success: false, error: 'PROVISION_SECRET not configured' });
@@ -33,34 +33,64 @@ router.post('/', async (req: Request, res: Response) => {
       return;
     }
 
-    const { duration } = req.body;
-    const dur = String(duration || '7');
+    const { reference, min_amount } = req.body;
 
-    const priceInfo = COMBO_PRICES[dur];
-    if (!priceInfo) {
-      res.status(400).json({
-        success: false,
-        error: `Invalid duration. Use "7" or "30"`,
-      });
+    if (!reference) {
+      res.status(400).json({ success: false, error: 'Missing reference (mã tham chiếu hoặc nội dung CK)' });
       return;
     }
 
-    // Find the most recent unprocessed incoming transaction >= minAmount
-    const transaction = await prisma.sepayTransaction.findFirst({
+    const minAmt = Number(min_amount) || 0;
+
+    // Try to match by: sepayId, referenceNumber, or content substring
+    const ref = String(reference).trim();
+
+    let transaction = await prisma.sepayTransaction.findFirst({
       where: {
         processed: false,
         transferType: 'in',
-        transferAmount: { gte: priceInfo.minAmount },
-        orderId: null,
+        referenceNumber: ref,
       },
-      orderBy: { createdAt: 'desc' },
     });
+
+    // Fallback: match by sepayId
+    if (!transaction && /^\d+$/.test(ref)) {
+      transaction = await prisma.sepayTransaction.findFirst({
+        where: {
+          processed: false,
+          transferType: 'in',
+          sepayId: Number(ref),
+        },
+      });
+    }
+
+    // Fallback: match by content containing the reference
+    if (!transaction) {
+      transaction = await prisma.sepayTransaction.findFirst({
+        where: {
+          processed: false,
+          transferType: 'in',
+          content: { contains: ref },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+    }
 
     if (!transaction) {
       res.status(404).json({
         success: false,
-        error: `Không tìm thấy bill thanh toán >= ${priceInfo.minAmount.toLocaleString('vi-VN')}đ. Vui lòng chuyển khoản trước.`,
-        min_amount: priceInfo.minAmount,
+        error: `Không tìm thấy giao dịch với mã "${ref}". Kiểm tra lại hoặc chờ vài phút để hệ thống cập nhật.`,
+      });
+      return;
+    }
+
+    // Check amount
+    if (minAmt > 0 && transaction.transferAmount < minAmt) {
+      res.status(400).json({
+        success: false,
+        error: `Số tiền ${transaction.transferAmount.toLocaleString('vi-VN')}đ chưa đủ (cần >= ${minAmt.toLocaleString('vi-VN')}đ).`,
+        amount: transaction.transferAmount,
+        required: minAmt,
       });
       return;
     }
@@ -71,26 +101,24 @@ router.post('/', async (req: Request, res: Response) => {
       data: { processed: true },
     });
 
-    logger.info('Combo: transaction verified', {
-      transactionId: transaction.sepayId,
+    logger.info('Bill verified', {
+      sepayId: transaction.sepayId,
       amount: transaction.transferAmount,
-      duration: dur,
-      content: transaction.content,
+      reference: ref,
     });
 
     res.json({
       success: true,
-      duration: dur,
-      label: priceInfo.label,
       transaction: {
         id: transaction.sepayId,
         amount: transaction.transferAmount,
         content: transaction.content,
         date: transaction.transactionDate,
+        reference: transaction.referenceNumber,
       },
     });
   } catch (err) {
-    logger.error('Combo create error', { error: err });
+    logger.error('Combo verify error', { error: err });
     res.status(500).json({ success: false, error: 'Internal error' });
   }
 });

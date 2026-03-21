@@ -79,19 +79,10 @@ router.post('/', async (req: Request, res: Response) => {
     const fullText = `${content || ''} ${description || ''}`.toUpperCase();
     const match = fullText.match(/DH[A-Z0-9]+/);
     if (!match) {
-      // No order code — try auto-detect plan from amount
-      const amount = Number(transferAmount) || 0;
-      const autoResult = await autoCreateKeyByAmount(amount, content || '', transaction.id);
-      if (autoResult) {
-        await prisma.sepayTransaction.update({
-          where: { id: transaction.id },
-          data: { processed: true },
-        });
-        logger.info('Sepay webhook: auto-created key', { amount, plan: autoResult.planId });
-      } else {
-        logger.info('Sepay webhook: no order code and amount not matched', { content, amount });
-      }
-      res.json({ success: true, message: autoResult ? 'Auto-processed' : 'No order code found' });
+      // No order code — save transaction only, do NOT auto-create key.
+      // Keys are created via PicoClaw bot when user pastes transfer content.
+      logger.info('Sepay webhook: no order code, saved for bot processing', { content, amount: transferAmount });
+      res.json({ success: true, message: 'Saved for bot processing' });
       return;
     }
 
