@@ -170,44 +170,70 @@ async function activateOrder(orderCode: string): Promise<{ apiKey: string; order
 }
 
 // ─── Success Redirect ──────────────────────────────────────────────────────
+// Only shows result — activation is done by Sepay webhook, NOT by visiting this URL.
 router.get('/success/:orderCode', async (req: Request, res: Response) => {
   try {
     const orderCode = req.params.orderCode as string;
-    const result = await activateOrder(orderCode);
 
-    if (!result) {
+    // Look up order — do NOT activate here (only webhook activates)
+    const order = await prisma.order.findUnique({ where: { orderCode } });
+    if (!order) {
       res.status(404).send(renderPage('Đơn hàng không tìm thấy', '<p>Mã đơn hàng không hợp lệ hoặc đã hết hạn.</p>', false));
       return;
     }
 
-    const plan = getPlan(result.order.planId);
-    const isUpgrade = result.isUpgrade;
+    // If already paid (activated by webhook), show the key
+    if (order.status === 'paid' && order.apiKeyId) {
+      const existingKey = await prisma.apiKey.findUnique({ where: { id: order.apiKeyId } });
+      const result = existingKey ? { apiKey: existingKey.key, order, isUpgrade: !!order.apiKeyId } : null;
+      if (!result) {
+        res.status(404).send(renderPage('Đơn hàng không tìm thấy', '<p>Mã đơn hàng không hợp lệ.</p>', false));
+        return;
+      }
+      // Show success page with key (already activated by webhook)
+      const plan = getPlan(result.order.planId);
+      const isUpgrade = result.isUpgrade;
+      res.send(renderPage(
+        isUpgrade ? 'Gia hạn thành công!' : 'Thanh toán thành công!',
+        `
+          <div class="success-icon">&#10003;</div>
+          <h2>${isUpgrade ? 'Gia hạn thành công!' : 'Thanh toán thành công!'}</h2>
+          <p>Đơn hàng <strong>${result.order.orderCode}</strong> đã được xác nhận.</p>
+          <div class="info-card">
+            <div class="info-row"><span>Gói dịch vụ</span><strong>${plan?.name || result.order.planId}${isUpgrade ? ' (gia hạn)' : ''}</strong></div>
+            <div class="info-row"><span>Số tiền</span><strong>${result.order.amount.toLocaleString('vi-VN')}đ</strong></div>
+            <div class="info-row"><span>Thời hạn</span><strong>+${plan?.durationDays || '?'} ngày</strong></div>
+          </div>
+          ${isUpgrade ? `
+          <div class="info-card" style="border-color:var(--success);margin-top:12px;">
+            <p style="text-align:center;color:#22c55e;font-weight:600;">API Key hiện tại đã được cập nhật.<br>Không cần đổi key.</p>
+          </div>
+          ` : `
+          <div class="key-box">
+            <p class="key-label">API Key của bạn</p>
+            <div class="key-value" id="apiKey">${result.apiKey}</div>
+            <button class="copy-btn" onclick="var t=document.getElementById('apiKey').textContent,a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');document.body.removeChild(a);this.textContent='Đã copy!';var b=this;setTimeout(function(){b.textContent='Copy API Key'},2000)">Copy API Key</button>
+          </div>
+          <p class="warning">&#9888; Hãy lưu API key này ngay. Bạn sẽ không thể xem lại sau khi rời trang.</p>
+          `}
+          <a href="/dashboard" class="btn-primary">Vào Dashboard &rarr;</a>
+        `,
+        true
+      ));
+      return;
+    }
+
+    // Order still pending — show waiting page
     res.send(renderPage(
-      isUpgrade ? 'Gia hạn thành công!' : 'Thanh toán thành công!',
+      'Đang chờ thanh toán',
       `
-        <div class="success-icon">&#10003;</div>
-        <h2>${isUpgrade ? 'Gia hạn thành công!' : 'Thanh toán thành công!'}</h2>
-        <p>Đơn hàng <strong>${result.order.orderCode}</strong> đã được xác nhận.</p>
-        <div class="info-card">
-          <div class="info-row"><span>Gói dịch vụ</span><strong>${plan?.name || result.order.planId}${isUpgrade ? ' (gia hạn)' : ''}</strong></div>
-          <div class="info-row"><span>Số tiền</span><strong>${result.order.amount.toLocaleString('vi-VN')}đ</strong></div>
-          <div class="info-row"><span>Thời hạn</span><strong>+${plan?.durationDays || '?'} ngày</strong></div>
-        </div>
-        ${isUpgrade ? `
-        <div class="info-card" style="border-color:var(--success);margin-top:12px;">
-          <p style="text-align:center;color:#22c55e;font-weight:600;">API Key hiện tại đã được cập nhật.<br>Không cần đổi key.</p>
-        </div>
-        ` : `
-        <div class="key-box">
-          <p class="key-label">API Key của bạn</p>
-          <div class="key-value" id="apiKey">${result.apiKey}</div>
-          <button class="copy-btn" onclick="var t=document.getElementById('apiKey').textContent,a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();document.execCommand('copy');document.body.removeChild(a);this.textContent='Đã copy!';var b=this;setTimeout(function(){b.textContent='Copy API Key'},2000)">Copy API Key</button>
-        </div>
-        <p class="warning">&#9888; Hãy lưu API key này ngay. Bạn sẽ không thể xem lại sau khi rời trang.</p>
-        `}
-        <a href="/dashboard" class="btn-primary">Vào Dashboard &rarr;</a>
+        <div class="success-icon" style="background:rgba(251,191,36,0.15);color:#fbbf24;">&#8987;</div>
+        <h2>Đang chờ xác nhận thanh toán</h2>
+        <p>Đơn hàng <strong>${orderCode}</strong> chưa được thanh toán hoặc đang xử lý.</p>
+        <p>Hệ thống sẽ tự động kích hoạt khi nhận được tiền. Vui lòng tải lại trang sau vài phút.</p>
+        <a href="/checkout/success/${orderCode}" class="btn-primary">Tải lại &rarr;</a>
       `,
-      true
+      false
     ));
   } catch (err) {
     logger.error('Checkout success error', { error: err });
