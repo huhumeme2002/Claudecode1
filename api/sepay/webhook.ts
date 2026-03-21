@@ -2,6 +2,9 @@ import { Router, Request, Response } from 'express';
 import prisma from '../../lib/db';
 import { getSepayApiKey } from '../../lib/sepay';
 import { activateOrder } from '../../lib/checkout-routes';
+import { getPlan } from '../../lib/plans';
+import { generateApiKey } from '../../lib/utils';
+import { sendTelegramNotification } from '../../lib/telegram';
 import logger from '../../lib/logger';
 
 const router = Router();
@@ -76,8 +79,19 @@ router.post('/', async (req: Request, res: Response) => {
     const fullText = `${content || ''} ${description || ''}`.toUpperCase();
     const match = fullText.match(/DH[A-Z0-9]+/);
     if (!match) {
-      logger.info('Sepay webhook: no order code found in content', { content, description });
-      res.json({ success: true, message: 'No order code found' });
+      // No order code — try auto-detect plan from amount
+      const amount = Number(transferAmount) || 0;
+      const autoResult = await autoCreateKeyByAmount(amount, content || '', transaction.id);
+      if (autoResult) {
+        await prisma.sepayTransaction.update({
+          where: { id: transaction.id },
+          data: { processed: true },
+        });
+        logger.info('Sepay webhook: auto-created key', { amount, plan: autoResult.planId });
+      } else {
+        logger.info('Sepay webhook: no order code and amount not matched', { content, amount });
+      }
+      res.json({ success: true, message: autoResult ? 'Auto-processed' : 'No order code found' });
       return;
     }
 
@@ -123,5 +137,84 @@ router.post('/', async (req: Request, res: Response) => {
     res.json({ success: false, message: 'Internal error' });
   }
 });
+
+// ─── Auto-create key by transfer amount (no order code) ──────────────────
+// Amount → plan mapping (sorted descending so highest match wins)
+const AMOUNT_PLAN_MAP = [
+  { min: 450000, planId: 'max20x' },
+  { min: 250000, planId: 'max5x' },
+  { min: 159000, planId: 'pro' },
+  { min: 150000, planId: 'week' },
+  { min: 50000,  planId: 'trial' },
+];
+
+function extractCustomerName(content: string): string {
+  // Try to extract name from transfer content
+  // Common patterns: "NGUYEN VAN A goi pro", "TEN KHACH HANG", etc.
+  const cleaned = content
+    .replace(/MBVCB\.\d+\.\d+\./i, '')
+    .replace(/FT\d+/gi, '')
+    .replace(/PAY[A-Z0-9]+/gi, '')
+    .replace(/CT\s+tu\s+\d+/gi, '')
+    .replace(/toi\s+\w+/gi, '')
+    .replace(/\d+/g, '')
+    .replace(/[^\w\sÀ-ỹ]/gi, '')
+    .trim();
+
+  // Take first meaningful words (likely customer name)
+  const words = cleaned.split(/\s+/).filter(w => w.length > 1);
+  if (words.length > 0) {
+    return words.slice(0, 4).join(' ');
+  }
+  return `Auto-${Date.now().toString(36)}`;
+}
+
+async function autoCreateKeyByAmount(
+  amount: number,
+  content: string,
+  transactionId: string
+): Promise<{ planId: string; key: string } | null> {
+  // Find matching plan by amount
+  const matched = AMOUNT_PLAN_MAP.find(m => amount >= m.min);
+  if (!matched) return null;
+
+  const plan = getPlan(matched.planId);
+  if (!plan) return null;
+
+  const customerName = extractCustomerName(content);
+  const newKey = generateApiKey();
+  const expiry = new Date();
+  expiry.setDate(expiry.getDate() + plan.durationDays);
+
+  await prisma.apiKey.create({
+    data: {
+      name: `${plan.name} - ${customerName}`,
+      key: newKey,
+      balance: 0,
+      enabled: true,
+      expiry,
+      rateLimitAmount: plan.rateLimitAmount,
+      rateLimitIntervalHours: plan.rateLimitIntervalHours,
+      rateLimitWindowStart: new Date(),
+      rateLimitWindowSpent: 0,
+    },
+  });
+
+  // Send Telegram notification with full key
+  const amountStr = amount.toLocaleString('vi-VN');
+  const expiryStr = expiry.toLocaleDateString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' });
+  sendTelegramNotification(
+    `🔑 <b>Auto Key Created</b>\n` +
+    `\n` +
+    `Gói: <b>${plan.name}</b> ($${plan.rateLimitAmount}/${plan.rateLimitIntervalHours}h)\n` +
+    `Số tiền: <b>${amountStr}đ</b>\n` +
+    `KH: ${customerName}\n` +
+    `Hết hạn: ${expiryStr}\n` +
+    `\n` +
+    `API Key:\n<code>${newKey}</code>`
+  ).catch(() => {});
+
+  return { planId: matched.planId, key: newKey };
+}
 
 export default router;
